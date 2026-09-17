@@ -151,8 +151,18 @@ function renderLab(lab, keepState) {
   body.innerHTML = tabDefs[0][1]();
   body.addEventListener('click', e => {
     if (e.target && e.target.id === 'soltoggle') {
-      store.set('hideSol', !store.get('hideSol', false));
+      store.set('hideSol', !store.get('hideSol', true));
       body.innerHTML = tabDefs[activeTab][1]();
+      return;
+    }
+    const wb = e.target.closest ? e.target.closest('.whybtn') : null;
+    if (wb) {
+      const why = wb.parentElement.nextElementSibling;
+      if (why) {
+        why.hidden = !why.hidden;
+        wb.setAttribute('aria-expanded', String(!why.hidden));
+        wb.classList.toggle('on', !why.hidden);
+      }
     }
   });
   left.append(tabs, body);
@@ -192,10 +202,19 @@ function renderLab(lab, keepState) {
   }
 }
 
+function taskHtml(t) {
+  const txt = typeof t === 'string' ? t : t.t;
+  const why = typeof t === 'string' ? null : t.why;
+  if (!why) return `<li><div class="taskline"><span class="tasktext">${txt}</span></div></li>`;
+  return `<li><div class="taskline"><span class="tasktext">${txt}</span>`
+    + `<button class="whybtn" aria-expanded="false">why?</button></div>`
+    + `<div class="taskwhy" hidden>${why}</div></li>`;
+}
+
 function instructionsHtml(lab, drill) {
-  const hideSol = store.get('hideSol', false);
+  const hideSol = store.get('hideSol', true);
   let h = `<p>${lab.intro}</p>`;
-  h += `<h3>Your tasks</h3><ol>${lab.tasks.map(t => `<li>${t}</li>`).join('')}</ol>`;
+  h += `<h3>Your tasks</h3><ol class="tasks">${lab.tasks.map(taskHtml).join('')}</ol>`;
   if (drill) {
     h += `<div class="callout"><b>Drill Mode is on.</b> Step-by-step commands are hidden — work from the task list and the live checks. Toggle Drill Mode off in the top bar if you get stuck.</div>`;
   } else {
@@ -218,7 +237,7 @@ function instructionsHtml(lab, drill) {
 }
 
 function referenceHtml(lab) {
-  const hideSol = store.get('hideSol', false);
+  const hideSol = store.get('hideSol', true);
   let h = `<h3>Command quick reference</h3><p class="dim">Every command this lab uses, in order — scan it before a from-memory rep.</p>`;
   const allCmds = `<pre>${lab.steps.map(s => s.c.join('\n')).join('\n')}</pre>`;
   h += hideSol ? `<details class="sol"><summary>Show all commands</summary>${allCmds}</details>` : allCmds;

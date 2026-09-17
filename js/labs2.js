@@ -23,9 +23,9 @@ L({
   },
   intro: `The server LAN (10.0.3.0/24) is for engineering only. Write a standard ACL that permits PC1's subnet and denies PC2's, applied <b>outbound</b> on the server-facing interface — standard ACLs go close to the destination.`,
   tasks: [
-    'Create standard ACL 10: permit 10.0.1.0/24, deny 10.0.2.0/24',
-    'Apply ACL 10 outbound on G0/2',
-    'PC1 can still ping the server; PC2 cannot',
+    { t: 'Create standard ACL 10: permit 10.0.1.0/24, deny 10.0.2.0/24', why: 'Standard ACLs (1-99) match SOURCE addresses only. Order matters — top-down, first match wins, and an invisible "deny any" sits at the bottom of every ACL.' },
+    { t: 'Apply ACL 10 outbound on G0/2', why: 'The placement rule: standard ACLs go close to the DESTINATION. Since they can\'t see where traffic is headed, filtering near the source would kill traffic to everything, not just the server LAN.' },
+    { t: 'PC1 can still ping the server; PC2 cannot', why: 'The permit line matches PC1\'s subnet first; PC2 falls to the deny. An ACL isn\'t done until you prove both what it blocks AND what it still allows.' },
   ],
   steps: [
     { t: 'Before: confirm both PCs reach the server (ping 10.0.3.100 from each PC tab).', c: ['ping 10.0.3.100'] },
@@ -65,9 +65,9 @@ L({
   },
   intro: `Policy: PC1's subnet may browse the web server (TCP 80) but must not ping it. Extended ACLs match protocol, source, destination and port — precise enough to sit <b>close to the source</b>.`,
   tasks: [
-    'Named extended ACL WEB-ONLY: permit tcp 10.0.1.0/24 → host 10.0.3.100 eq 80; deny icmp same pair; permit ip any any',
-    'Apply WEB-ONLY inbound on G0/0',
-    'Ping from PC1 to the server is blocked (web would still work)',
+    { t: 'Named extended ACL WEB-ONLY: permit tcp 10.0.1.0/24 → host 10.0.3.100 eq 80; deny icmp same pair; permit ip any any', why: 'Extended ACLs match the full 5-tuple: protocol, source, destination, ports. Specific rules go on top; the broad "permit ip any any" catch-all must come LAST or nothing after it ever matches.' },
+    { t: 'Apply WEB-ONLY inbound on G0/0', why: 'The placement rule, flipped: extended ACLs go close to the SOURCE. They identify traffic exactly, so drop doomed packets at the first router instead of carrying them across the network.' },
+    { t: 'Ping from PC1 to the server is blocked (web would still work)', why: 'Surgical filtering: same two hosts, ICMP dies at the deny line while TCP/80 sails through the permit above it. That per-protocol precision is why extended ACLs exist.' },
   ],
   steps: [
     { t: 'Create the named extended ACL.', c: ['enable', 'configure terminal', 'ip access-list extended WEB-ONLY', 'permit tcp 10.0.1.0 0.0.0.255 host 10.0.3.100 eq 80', 'deny icmp 10.0.1.0 0.0.0.255 host 10.0.3.100', 'permit ip any any', 'exit'], note: 'Named ACL mode gives you sequence numbers you can edit later — a big win over numbered ACLs.' },
@@ -103,10 +103,10 @@ L({
   setupAll: topo => { const i = ND.getIface(topo.devs.R1, 'g0/0'); i.shutdown = false; },
   intro: `Map an unknown network with discovery protocols, then flip the security switch: CDP off, LLDP on. Discovery data is gold to you — and to an attacker.`,
   tasks: [
-    'Use CDP to identify all neighbors of SW1',
-    'Disable CDP globally on R1',
-    'Enable LLDP globally on all three devices',
-    'Verify LLDP neighbors on SW1',
+    { t: 'Use CDP to identify all neighbors of SW1', why: 'Discovery protocols hand you the network map for free: neighbor hostname, platform, their port, even IP addresses in detail view. First tool out of the bag on an unfamiliar network.' },
+    { t: 'Disable CDP globally on R1', why: 'The same free map helps an attacker enumerate your gear. Security policies commonly silence CDP on untrusted edges — know both "no cdp run" (global) and "no cdp enable" (per interface).' },
+    { t: 'Enable LLDP globally on all three devices', why: 'LLDP (IEEE 802.1AB) is the vendor-neutral equivalent — the choice in multi-vendor networks. Unlike CDP, it\'s OFF by default on Cisco gear, so every device needs "lldp run".' },
+    { t: 'Verify LLDP neighbors on SW1', why: 'Reading neighbor output correctly is the exam skill: "Local Intf" is YOUR port, "Port ID" is THEIR port. R1 now appears via LLDP even though its CDP is silent.' },
   ],
   steps: [
     { t: 'Explore from SW1 — who is on which port?', c: ['enable', 'show cdp neighbors', 'show cdp neighbors detail'], note: 'Detail view exposes IOS version and IP addresses — exactly why security policies often disable CDP on untrusted edges.' },
@@ -144,9 +144,9 @@ L({
   },
   intro: `Logs with wrong timestamps are useless and certificates break. Make R2 an authoritative time source (NTP master, stratum 3) and sync R1 to it.`,
   tasks: [
-    'R2: ntp master with stratum 3',
-    'R1: ntp server 10.0.0.2',
-    'R1 shows "Clock is synchronized"',
+    { t: 'R2: ntp master with stratum 3', why: 'Someone must be authoritative. Stratum counts hops from a reference clock (1 = atomic/GPS); claiming 3 makes R2\'s clients sit at stratum 4. 16 means "unsynchronized".' },
+    { t: 'R1: ntp server 10.0.0.2', why: 'Points R1 at R2 over UDP 123. Devices prefer the lowest-stratum source they can reach — this is a client-server relationship, not a peering.' },
+    { t: 'R1 shows "Clock is synchronized"', why: 'The payoff: logs with wrong timestamps are useless for troubleshooting, and certificates break entirely when clocks disagree. Sync is the boring feature everything else depends on.' },
   ],
   steps: [
     { t: 'On R2, become an NTP master at stratum 3.', c: ['enable', 'configure terminal', 'ntp master 3'], note: 'Stratum counts hops from the reference clock: 1 = atomic/GPS source. R2 claims 3, so clients of R2 sit at stratum 4.' },
@@ -186,11 +186,11 @@ L({
   },
   intro: `R1 becomes the DHCP server for <em>both</em> LANs. Its own LAN is easy; PC2's LAN is a hop away, so R2 must relay broadcasts with <code>ip helper-address</code>. Routing between the routers is pre-configured — focus on DHCP.`,
   tasks: [
-    'R1: exclude .1-.9 in both subnets from assignment',
-    'R1: pool LAN1 — network 10.0.1.0/24, default-router 10.0.1.1, dns-server 8.8.8.8',
-    'R1: pool LAN2 — network 10.0.2.0/24, default-router 10.0.2.1, dns-server 8.8.8.8',
-    'R2 G0/0: ip helper-address 10.0.12.1',
-    'Both PCs obtain addresses via DHCP (ipconfig /renew)',
+    { t: 'R1: exclude .1-.9 in both subnets from assignment', why: 'Protects the static addresses (gateways, servers, printers) from being leased to a random laptop. On real gear: exclude BEFORE enabling the pool, or it\'s a race.' },
+    { t: 'R1: pool LAN1 — network 10.0.1.0/24, default-router 10.0.1.1, dns-server 8.8.8.8', why: 'The lease definition for the local LAN: the network line says who this pool serves, and the options (gateway, DNS) ride along in the DHCP OFFER.' },
+    { t: 'R1: pool LAN2 — network 10.0.2.0/24, default-router 10.0.2.1, dns-server 8.8.8.8', why: 'A pool for a subnet R1 isn\'t even connected to! The server picks it by matching the relay agent\'s source address (giaddr) against pool networks.' },
+    { t: 'R2 G0/0: ip helper-address 10.0.12.1', why: 'Routers kill broadcasts, so PC2\'s DISCOVER would never reach R1. The helper converts the broadcast into a unicast aimed at the real server — on the interface that HEARS the clients.' },
+    { t: 'Both PCs obtain addresses via DHCP (ipconfig /renew)', why: 'DORA end to end: Discover, Offer, Request, Ack. One lease is local, the other proves relay works across the router hop.' },
   ],
   steps: [
     { t: 'Reserve the low addresses first — before any pool exists.', c: ['enable', 'configure terminal', 'ip dhcp excluded-address 10.0.1.1 10.0.1.9', 'ip dhcp excluded-address 10.0.2.1 10.0.2.9'] },
@@ -229,9 +229,9 @@ L({
   },
   intro: `Those %LINK-5-CHANGED messages you keep seeing? That's syslog. Point R1 at a syslog server, cap the export at warnings-and-worse, and keep a local buffer for everything.`,
   tasks: [
-    'Send logs to syslog server 10.0.0.100',
-    'Limit exported messages to severity warnings (level 4) and worse',
-    'Enable a 16384-byte local logging buffer',
+    { t: 'Send logs to syslog server 10.0.0.100', why: 'Logs stored only on the device vanish with the device. Shipping them to a server (UDP 514) preserves the evidence when a box dies or gets compromised.' },
+    { t: 'Limit exported messages to severity warnings (level 4) and worse', why: 'The 0-7 severity scale, memorized: Emergency, Alert, Critical, Error, Warning, Notification, Informational, Debugging. "trap warnings" = level 4 and numerically lower (more severe).' },
+    { t: 'Enable a 16384-byte local logging buffer', why: 'A local RAM history for quick "what just happened?" checks via show logging — no server round-trip needed, but lost on reboot.' },
   ],
   steps: [
     { t: 'Point logging at the server.', c: ['enable', 'configure terminal', 'logging host 10.0.0.100'] },
@@ -262,10 +262,10 @@ L({
   layout: { PC1: [90, 45], SW1: [260, 45] },
   intro: `Make SW1 remotely manageable — the secure way. Management SVI, then the full SSH stack: hostname + domain (the RSA key is named from them), keys, version 2, local users, and vty lines that refuse telnet.`,
   tasks: [
-    'Hostname SW1; management SVI VLAN 1 = 192.168.1.2/24',
-    'ip domain-name netdrill.lab and 2048-bit RSA keys',
-    'Local user admin (secret cisco123); SSH version 2',
-    'VTY 0-4: login local + transport input ssh',
+    { t: 'Hostname SW1; management SVI VLAN 1 = 192.168.1.2/24', why: 'A layer-2 switch needs an IP somewhere to be managed remotely at all — that somewhere is an SVI. And the hostname can\'t stay "Switch": the RSA key is named hostname.domain.' },
+    { t: 'ip domain-name netdrill.lab and 2048-bit RSA keys', why: 'The keypair SSH encrypts with. IOS refuses to generate keys without a domain name set — feel that error once and the ordering sticks forever.' },
+    { t: 'Local user admin (secret cisco123); SSH version 2', why: 'SSH needs someone to log in AS — a local user database (or AAA). Version 2 fixes v1\'s known weaknesses and requires keys of at least 768 bits.' },
+    { t: 'VTY 0-4: login local + transport input ssh', why: 'The lock on the remote door: authenticate against local users, and refuse telnet entirely — telnet sends every keystroke, passwords included, in cleartext.' },
   ],
   steps: [
     { t: 'Hostname and a management IP on the VLAN 1 SVI.', c: ['enable', 'configure terminal', 'hostname SW1', 'interface vlan 1', 'ip address 192.168.1.2 255.255.255.0', 'no shutdown'] },
@@ -307,9 +307,9 @@ L({
   },
   intro: `The internal server 192.168.1.100 must be reachable from outside as 203.0.113.100. Mark R1's NAT domains and map the address one-to-one.`,
   tasks: [
-    'G0/0 = ip nat inside, G0/1 = ip nat outside',
-    'Static mapping: 192.168.1.100 ↔ 203.0.113.100',
-    'Verify with show ip nat translations',
+    { t: 'G0/0 = ip nat inside, G0/1 = ip nat outside', why: 'NAT must know which side is private and which is public before any rule can work — translation happens as packets cross from one domain to the other.' },
+    { t: 'Static mapping: 192.168.1.100 ↔ 203.0.113.100', why: 'One-to-one and bidirectional: outsiders can INITIATE connections to the global address — that\'s the point of static NAT (hosting a server). Learn the names: inside local vs inside global.' },
+    { t: 'Verify with show ip nat translations', why: 'The translation table is the ground truth. A static entry sits there permanently; dynamic/PAT entries only appear while flows are active.' },
   ],
   steps: [
     { t: 'Mark the inside interface.', c: ['enable', 'configure terminal', 'interface g0/0', 'ip nat inside'] },
@@ -347,9 +347,9 @@ L({
   },
   intro: `The whole 192.168.1.0/24 LAN shares R1's single public address — the NAT that runs on every home router. Define the inside sources with an ACL, then overload the outside interface.`,
   tasks: [
-    'ACL 1 permits 192.168.1.0/24',
-    'G0/0 inside, G0/1 outside',
-    'ip nat inside source list 1 interface g0/1 overload',
+    { t: 'ACL 1 permits 192.168.1.0/24', why: 'Here the ACL blocks nothing — it\'s a CLASSIFIER answering "who is allowed to be translated?" ACLs as traffic-matchers show up all over IOS (NAT, VPNs, QoS).' },
+    { t: 'G0/0 inside, G0/1 outside', why: 'Same domain-marking as static NAT: translation only happens inside→outside, so the router has to know which interface is which.' },
+    { t: 'ip nat inside source list 1 interface g0/1 overload', why: '"overload" is the whole trick: rewrite source IP AND port, tracking each flow by unique port number. ~65k ports means one public IP serves an entire office — this is home-router NAT.' },
   ],
   steps: [
     { t: 'Define which sources get translated.', c: ['enable', 'configure terminal', 'access-list 1 permit 192.168.1.0 0.0.0.255'], note: 'Here the ACL isn\'t blocking anything — it\'s a <em>traffic classifier</em> answering "who may be translated?"' },
@@ -382,10 +382,10 @@ L({
   layout: { PC1: [70, 20], PC2: [70, 90], SW1: [240, 55] },
   intro: `Pin each access port to the device plugged into it. F0/1 learns PC1's MAC sticky; F0/2 gets restrict mode so violations are logged, not fatal.`,
   tasks: [
-    'F0/1: access mode, port-security, max 1, sticky MAC learning (default shutdown violation)',
-    'F0/2: access mode, port-security, max 1, violation restrict',
-    'Generate traffic so F0/1 sticky-learns PC1\'s MAC',
-    'Verify with show port-security',
+    { t: 'F0/1: access mode, port-security, max 1, sticky MAC learning (default shutdown violation)', why: 'Pins the port to whichever device plugs in first. Order matters: port-security is REJECTED on a dynamic-mode port — set static access mode first. Default violation err-disables the port.' },
+    { t: 'F0/2: access mode, port-security, max 1, violation restrict', why: 'The gentler mode: drop offending frames, log and count each one, port stays up. (protect drops silently — no log, no counter — which is why it\'s the trick answer.)' },
+    { t: 'Generate traffic so F0/1 sticky-learns PC1\'s MAC', why: 'Sticky learning needs a frame to learn from. The learned MAC gets written into the running config — save it and the binding survives reboots.' },
+    { t: 'Verify with show port-security', why: 'The audit view: max vs current addresses, violation count, action per port. Also how you spot a port sitting in Secure-shutdown after an incident.' },
   ],
   steps: [
     { t: 'Port security requires a static access (or trunk) port first — dynamic is rejected.', c: ['enable', 'configure terminal', 'interface f0/1', 'switchport mode access', 'switchport port-security'], note: 'Try enabling port-security before setting the mode — IOS refuses with "Command rejected". Feel that error once so you never forget the order.' },
@@ -426,10 +426,10 @@ L({
   },
   intro: `A rogue DHCP server on an access port can hand out itself as everyone's gateway (man-in-the-middle). DHCP snooping sorts ports into <b>trusted</b> (toward the real server) and <b>untrusted</b> (everything else) and drops server-messages arriving on untrusted ports. R1 is already serving DHCP — secure the switch.`,
   tasks: [
-    'Enable DHCP snooping globally on SW1',
-    'Scope it to VLAN 1',
-    'Trust only the uplink G0/1 toward R1',
-    'PC1 can still get a lease (ipconfig /renew)',
+    { t: 'Enable DHCP snooping globally on SW1', why: 'The master switch — but inert on its own: nothing is inspected until you also scope VLANs. Two-step enablement is a favorite exam detail.' },
+    { t: 'Scope it to VLAN 1', why: 'Now filtering is live where the hosts are: server messages (OFFER/ACK/NAK) arriving on untrusted ports get dropped, killing rogue DHCP servers.' },
+    { t: 'Trust only the uplink G0/1 toward R1', why: 'All ports default to untrusted. The legitimate server\'s replies come through the uplink, so that one port — and only that one — gets trusted.' },
+    { t: 'PC1 can still get a lease (ipconfig /renew)', why: 'Hardening that breaks the legitimate flow is just an outage. Client messages are fine from untrusted ports; the lease also populates the binding table that Dynamic ARP Inspection builds on.' },
   ],
   steps: [
     { t: 'Turn snooping on globally — nothing is filtered until a VLAN is scoped.', c: ['enable', 'configure terminal', 'ip dhcp snooping'] },
