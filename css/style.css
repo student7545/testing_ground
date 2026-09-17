@@ -194,6 +194,31 @@ code, kbd { font-family: var(--mono); font-size: .92em; background: var(--chip);
   border-radius: 0 6px 6px 0; padding: 8px 12px; margin: 10px 0; font-size: 13.5px;
 }
 
+.ctlrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.ctlrow h3 { margin: 0; }
+.btn.small { font-size: 12px; padding: 3px 10px; }
+
+.tabbody details { margin: 6px 0; }
+.tabbody details > summary {
+  cursor: pointer; user-select: none; list-style: none; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; color: var(--accent);
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; background: var(--panel);
+}
+.tabbody details > summary::-webkit-details-marker { display: none; }
+.tabbody details > summary::before { content: '▸'; font-size: 10px; }
+.tabbody details[open] > summary::before { content: '▾'; }
+.tabbody details > summary:hover { background: var(--panel-2); }
+.tabbody details.explain > summary { color: var(--text-dim); border-style: dashed; }
+.explain-body {
+  border-left: 3px solid var(--border); padding: 6px 12px; margin: 8px 0 4px;
+  font-size: 13px; color: var(--text-dim);
+}
+.explain-body p { margin: 4px 0 8px; }
+.explain-body ul { margin: 4px 0; padding-left: 4px; list-style: none; }
+.explain-body li { margin: 6px 0; }
+.explain-body code { color: var(--text); white-space: nowrap; }
+.explain-body .dash { margin: 0 6px; opacity: .6; }
+
 .topo { padding: 10px 12px 4px; border-bottom: 1px solid var(--border); background: var(--panel); }
 .topo svg { width: 100%; height: auto; display: block; }
 .topo .devbox { fill: var(--panel-2); stroke: var(--border); }
