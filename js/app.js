@@ -280,28 +280,24 @@ function paintTerm() {
 
   const dev = activeDev();
   const inLine = el('div', 'inline-input');
-  const promptSpan = el('span', '', null);
+  const promptSpan = el('span', 'prompt', null);
   promptSpan.textContent = ND.promptFor(dev);
   const input = document.createElement('input');
   input.id = 'cli-input';
   input.autocomplete = 'off';
   input.spellcheck = false;
   input.setAttribute('aria-label', 'IOS command input');
-  input.style.cssText = 'background:transparent;border:none;outline:none;color:inherit;font:inherit;width:60%;caret-color:transparent;padding:0;';
   if (ND.isPasswordPrompt(dev)) input.type = 'password';
-  const echo = el('span');           // mirrors input text so the caret block sits after it
-  const cursor = el('span', 'cursor');
-  inLine.append(promptSpan, echo, cursor, input);
+  inLine.append(promptSpan, input);
   term.appendChild(inLine);
 
-  input.addEventListener('input', () => { echo.textContent = ND.isPasswordPrompt(dev) ? '' : input.value; });
-  input.addEventListener('keydown', e => handleKey(e, input, echo));
+  input.addEventListener('keydown', e => handleKey(e, input));
   term.scrollTop = term.scrollHeight;
 }
 
 function focusInput() { const i = $('#cli-input'); if (i) i.focus({ preventScroll: true }); }
 
-function handleKey(e, input, echo) {
+function handleKey(e, input) {
   const dev = activeDev();
   const s = dev.sess;
   if (e.key === 'Enter') {
@@ -311,7 +307,7 @@ function handleKey(e, input, echo) {
     push(ND.promptFor(dev) + (masked ? '' : line));
     if (line.trim() && !masked) { s.history.push(line); s.hIdx = s.history.length; }
     ND.execLine(S.topo, dev, line, (text, cls) => push(text, cls));
-    input.value = ''; echo.textContent = '';
+    input.value = '';
     paintTerm(); focusInput();
     runChecks();
   } else if (e.key === '?' && dev.type !== 'pc' && !ND.isPasswordPrompt(dev)) {
@@ -321,22 +317,22 @@ function handleKey(e, input, echo) {
     for (const h of ND.helpFor(S.topo, dev, before)) push(h);
     paintTerm();
     const ni = $('#cli-input');
-    if (ni) { ni.value = before; ni.dispatchEvent(new Event('input')); ni.focus({ preventScroll: true }); }
+    if (ni) { ni.value = before; ni.focus({ preventScroll: true }); }
   } else if (e.key === 'Tab') {
     e.preventDefault();
     const completed = ND.completeFor(S.topo, dev, input.value);
-    if (completed) { input.value = completed; echo.textContent = completed; }
+    if (completed) input.value = completed;
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    if (s.history.length) { s.hIdx = Math.max(0, s.hIdx - 1); input.value = s.history[s.hIdx] || ''; echo.textContent = input.value; }
+    if (s.history.length) { s.hIdx = Math.max(0, s.hIdx - 1); input.value = s.history[s.hIdx] || ''; }
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
     s.hIdx = Math.min(s.history.length, s.hIdx + 1);
-    input.value = s.history[s.hIdx] || ''; echo.textContent = input.value;
+    input.value = s.history[s.hIdx] || '';
   } else if (e.ctrlKey && (e.key === 'c' || e.key === 'C') && !window.getSelection().toString()) {
     e.preventDefault();
     push(ND.promptFor(dev) + input.value + '^C');
-    input.value = ''; echo.textContent = '';
+    input.value = '';
     paintTerm(); focusInput();
   } else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
