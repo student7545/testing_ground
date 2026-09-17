@@ -136,6 +136,7 @@ code, kbd { font-family: var(--mono); font-size: .92em; background: var(--chip);
 .repbadge {
   font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums;
   background: var(--chip); color: var(--text-dim); border-radius: 999px; padding: 2px 10px;
+  white-space: nowrap;
 }
 .repbadge.done { background: var(--good-soft); color: var(--good); font-weight: 600; }
 .devchips { margin-left: auto; display: flex; gap: 4px; }
