@@ -286,7 +286,7 @@ cmd(['priv'], 'terminal length NUM', 'Set number of lines on a screen', () => {}
 /* ---- ping / traceroute ---- */
 function doPing(c, ip) {
   if (!ND.isIp(ip)) { c.out('Translating "' + ip + '"...domain server (255.255.255.255)\n% Unrecognized host or address.', 'err'); return; }
-  const res = ND.tracePacket(c.topo, c.dev, ip, { proto: 'icmp' });
+  const res = ND.tracePacket(c.topo, c.dev, ip, { proto: 'icmp', learn: true });
   c.out('Type escape sequence to abort.');
   c.out(`Sending 5, 100-byte ICMP Echos to ${ip}, timeout is 2 seconds:`);
   if (res.ok) c.out('!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/2/4 ms');
@@ -297,7 +297,7 @@ cmd(['exec', 'priv'], 'ping WORD', 'Send echo messages', (c, a) => doPing(c, a[0
 cmd(['exec', 'priv'], 'traceroute WORD', 'Trace route to destination', (c, a) => {
   const ip = a[0];
   if (!ND.isIp(ip)) return c.out('% Unrecognized host or address.', 'err');
-  const res = ND.tracePacket(c.topo, c.dev, ip, { proto: 'icmp' });
+  const res = ND.tracePacket(c.topo, c.dev, ip, { proto: 'icmp', learn: true });
   c.out(`Type escape sequence to abort.\nTracing the route to ${ip}\n`);
   if (res.ok) {
     let n = 1;

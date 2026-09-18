@@ -408,7 +408,7 @@ ND.tracePacket = function (topo, srcDev, dstIp, pkt, checkReverse = true) {
     if (inAcl && !ND.aclCheck(nxt.dev, inAcl, { ...pkt, dst: dstIp })) return { ok: false, reason: 'acl', at: nxt.dev.id, path, srcIp };
     // vty access-class for telnet/ssh handled by caller
     path.push(nxt.dev.id);
-    ND.learnMacs(topo, cur, exitIfc, nxt);
+    if (pkt.learn) ND.learnMacs(topo, cur, exitIfc, nxt.dev, nxt.ifc);
     if (ND.devIps(topo, nxt.dev).some(a => a.ip === dstIp)) {
       if (checkReverse && srcIp) {
         const back = ND.tracePacket(topo, nxt.dev, srcIp, { proto: pkt.proto, src: dstIp }, false);
@@ -423,25 +423,69 @@ ND.tracePacket = function (topo, srcDev, dstIp, pkt, checkReverse = true) {
   return { ok: false, reason: 'ttl', path, srcIp };
 };
 
-/* Record MAC addresses learned along a delivery (rough but satisfying). */
-ND.learnMacs = function (topo, fromDev, exitIfc, arrived) {
-  // walk switches between fromDev and arrived.dev on this segment; keep it simple:
-  for (const dev of Object.values(topo.devs)) {
-    if (dev.type !== 'switch') continue;
-    for (const port of Object.values(dev.ifaces)) {
-      if (!/^(Gigabit|Fast|Ten|Ether)/.test(port.name) || !ND.ifaceUp(topo, dev, port)) continue;
-      const peer = ND.linkPeer(topo, dev, port.name);
-      if (!peer) continue;
-      // learn peer device's MAC (or the MAC behind it) — only direct neighbors for realism
-      if (peer.dev.type !== 'switch') {
-        const pIfc = peer.dev.ifaces[peer.iface];
-        if (!pIfc) continue;
-        const vlan = ND.operMode(topo, dev, port) === 'access' ? port.accessVlan : port.nativeVlan;
-        const key = pIfc.mac + '|' + port.name;
-        if (!dev.macTable.some(e => e.key === key)) dev.macTable.push({ key, vlan, mac: pIfc.mac, port: port.name });
-        // port-security sticky learning + violation
-        ND.portSecLearn(topo, dev, port, pIfc.mac);
+/* Which physical port on `sw` leads toward `target`? Breadth-first over the
+   physical links, so a switch two hops away still learns on its uplink. */
+const PHYS = /^(Gigabit|Fast|Ten|Ether)/;
+ND.portToward = function (topo, sw, target) {
+  const seen = new Set([sw.id]);
+  let frontier = [];
+  for (const port of Object.values(sw.ifaces)) {
+    if (!PHYS.test(port.name) || port.parent || !ND.ifaceUp(topo, sw, port)) continue;
+    const peer = ND.linkPeer(topo, sw, port.name);
+    if (!peer) continue;
+    if (peer.dev === target) return port.name;
+    if (!seen.has(peer.dev.id)) { seen.add(peer.dev.id); frontier.push({ via: port.name, dev: peer.dev }); }
+  }
+  while (frontier.length) {
+    const next = [];
+    for (const f of frontier) {
+      if (f.dev.type !== 'switch') continue;       // only switches pass frames onward
+      for (const port of Object.values(f.dev.ifaces)) {
+        if (!PHYS.test(port.name) || port.parent || !ND.ifaceUp(topo, f.dev, port)) continue;
+        const peer = ND.linkPeer(topo, f.dev, port.name);
+        if (!peer || seen.has(peer.dev.id)) continue;
+        if (peer.dev === target) return f.via;
+        seen.add(peer.dev.id);
+        next.push({ via: f.via, dev: peer.dev });
       }
+    }
+    frontier = next;
+  }
+  return null;
+};
+
+/* The access VLAN a host sits in, as seen by the switch it plugs into. */
+ND.vlanOfHost = function (topo, dev) {
+  for (const sw of Object.values(topo.devs)) {
+    if (sw.type !== 'switch') continue;
+    for (const port of Object.values(sw.ifaces)) {
+      if (!PHYS.test(port.name) || port.noSwitchport) continue;
+      const peer = ND.linkPeer(topo, sw, port.name);
+      if (peer && peer.dev === dev && ND.operMode(topo, sw, port) === 'access') return port.accessVlan;
+    }
+  }
+  return null;
+};
+
+/* Record the source and destination MACs of a delivered frame on every switch
+   that carried it. Only called for traffic the user actually generated — the
+   lab checks must never mutate device state. */
+ND.learnMacs = function (topo, aDev, aIfc, bDev, bIfc) {
+  for (const sw of Object.values(topo.devs)) {
+    if (sw.type !== 'switch') continue;
+    for (const [dev, ifc] of [[aDev, aIfc], [bDev, bIfc]]) {
+      if (!dev || !ifc || dev === sw) continue;
+      const portName = ND.portToward(topo, sw, dev);
+      if (!portName) continue;
+      const port = sw.ifaces[portName];
+      if (!port || port.noSwitchport) continue;
+      const vlan = ND.vlanOfHost(topo, dev)
+        ?? (ND.operMode(topo, sw, port) === 'access' ? port.accessVlan : port.nativeVlan);
+      if (!sw.vlans[vlan]) continue;
+      // a MAC lives on exactly one port per VLAN — moving it replaces the old entry
+      sw.macTable = sw.macTable.filter(e => !(e.mac === ifc.mac && e.vlan === vlan));
+      sw.macTable.push({ key: ifc.mac + '|' + portName, vlan, mac: ifc.mac, port: portName });
+      ND.portSecLearn(topo, sw, port, ifc.mac);
     }
   }
 };

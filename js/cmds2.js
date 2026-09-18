@@ -509,7 +509,7 @@ function pcIpconfig(c, all) {
   if (all && net.dns) c.out(`   DNS Servers . . . . . . . . . . . : ${net.dns}`);
 }
 cmd(['pc'], 'ping IP', 'Send ICMP echo request', (c, a) => {
-  const res = ND.tracePacket(c.topo, c.dev, a[0], { proto: 'icmp' });
+  const res = ND.tracePacket(c.topo, c.dev, a[0], { proto: 'icmp', learn: true });
   c.out(`\nPinging ${a[0]} with 32 bytes of data:\n`);
   if (res.ok) {
     for (let k = 0; k < 4; k++) c.out(`Reply from ${a[0]}: bytes=32 time=${1 + k}ms TTL=${128 - res.path.length}`);
@@ -523,7 +523,7 @@ cmd(['pc'], 'ping IP', 'Send ICMP echo request', (c, a) => {
   }
 });
 cmd(['pc'], 'tracert IP', 'Trace route', (c, a) => {
-  const res = ND.tracePacket(c.topo, c.dev, a[0], { proto: 'icmp' });
+  const res = ND.tracePacket(c.topo, c.dev, a[0], { proto: 'icmp', learn: true });
   c.out(`\nTracing route to ${a[0]} over a maximum of 30 hops\n`);
   if (res.ok) {
     let n = 1;

@@ -98,7 +98,8 @@ L({
     { t: 'Ping PC2 from PC1 — this makes SW1 learn both source MACs.', c: ['ping 192.168.1.12'] },
     { t: 'Switch to PC2 and ping back.', c: ['ping 192.168.1.11'] },
     { t: 'On SW1, inspect the MAC address table.', c: ['enable', 'show mac address-table'], note: 'Each entry maps a VLAN + MAC to the port it was learned on. Compare with <code>ipconfig /all</code> on the PCs.' },
-    { t: 'Clear the table and watch it repopulate after another ping.', c: ['clear mac address-table dynamic', 'show mac address-table'] },
+    { t: 'Clear the learned entries and confirm the table is now empty.', c: ['clear mac address-table dynamic', 'show mac address-table'], note: 'Note the required <code>dynamic</code> keyword — without it IOS answers "% Incomplete command." Press <kbd>?</kbd> after <code>clear mac address-table</code> to see the options.' },
+    { t: 'Go back to the PC1 tab and ping PC2 again, then re-check the table on SW1.', c: ['ping 192.168.1.12'], note: 'Run the ping on PC1, then <code>show mac address-table</code> on SW1 — the entries are back. Learning is automatic and continuous; clearing only buys a moment of silence.' },
   ],
   verify: ['show mac address-table', 'show interfaces status'],
   explain: `<h3>How switches learn</h3>
