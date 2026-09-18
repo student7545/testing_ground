@@ -25,6 +25,10 @@ function buildTopo(lab) {
 }
 
 /* ---------- app shell: persistent sidebar + swappable content ---------- */
+const TIERS = [
+  { key: 'core', label: 'Core labs', note: 'one topic each' },
+  { key: 'deep', label: 'Comprehensive', note: 'every command, in depth' },
+];
 const VOLUMES = [
   { n: 1, title: 'Volume 1', sub: 'Fundamentals, Switching & Routing', note: 'JITL Days 1\u201332 \u00b7 Acing the CCNA Exam Vol 1' },
   { n: 2, title: 'Volume 2', sub: 'ACLs, Services & Security', note: 'JITL Days 33+ \u00b7 Acing the CCNA Exam Vol 2' },
@@ -68,14 +72,19 @@ function renderSidebar(activeId) {
       `<span class="navsection-title">${v.title}</span>` +
       `<span class="navsection-count">${doneCount}/${labs.length}</span>` +
       `<span class="navsection-sub">${v.sub}</span>`));
-    for (const lab of labs) {
-      const reps = repsOf(lab.id);
-      const row = el('button', 'navrow' + (lab.id === activeId ? ' active' : ''),
-        `<span class="navday">${lab.day}</span>` +
-        `<span class="navtitle">${lab.title}</span>` +
-        (reps ? `<span class="navreps" title="${reps} rep${reps > 1 ? 's' : ''} completed">${reps}</span>` : ''));
-      row.addEventListener('click', () => { location.hash = '#/lab/' + lab.id; closeNav(); });
-      list.appendChild(row);
+    for (const tier of TIERS) {
+      const tierLabs = labs.filter(l => (l.tier || 'core') === tier.key);
+      if (!tierLabs.length) continue;
+      list.appendChild(el('div', 'navsub', `${tier.label}<span class="navsub-note">${tier.note}</span>`));
+      for (const lab of tierLabs) {
+        const reps = repsOf(lab.id);
+        const row = el('button', 'navrow' + (lab.id === activeId ? ' active' : ''),
+          `<span class="navday">${lab.day}</span>` +
+          `<span class="navtitle">${lab.title}</span>` +
+          (reps ? `<span class="navreps" title="${reps} rep${reps > 1 ? 's' : ''} completed">${reps}</span>` : ''));
+        row.addEventListener('click', () => { location.hash = '#/lab/' + lab.id; closeNav(); });
+        list.appendChild(row);
+      }
     }
   }
   nav.appendChild(list);
@@ -300,7 +309,7 @@ function instructionsHtml(lab, drill) {
     if (hideSol) h += `<p class="dim">Commands are tucked away — try each step from memory, then reveal only if you need to.</p>`;
     h += `<ol>`;
     for (const s of lab.steps) {
-      h += `<li>${s.t}`;
+      h += `<li>${s.d ? `<span class="stepdev">${s.d}</span>` : ''}${s.t}`;
       const sol = `<pre>${s.c.join('\n')}</pre>`;
       h += hideSol ? `<details class="sol"><summary>Show commands</summary>${sol}</details>` : sol;
       h += `<details class="explain"><summary>Explain this step</summary><div class="explain-body">`

@@ -65,8 +65,9 @@ ND.makeIface = function (name, dev) {
   return {
     name, mac: ND.newMac(),
     ip: null, ipv6: [], ipv6LL: null, ipv6Enable: false,
-    // routers ship with ports admin-down; switches ship up
-    shutdown: dev.type === 'router' && !isSub ? true : false,
+    // routers ship physical ports admin-down; switches ship up; virtual
+    // interfaces (loopback, SVI, port-channel, tunnel) are never admin-down
+    shutdown: dev.type === 'router' && !isSub && !isVirtual,
     desc: '', speed: 'auto', duplex: 'auto',
     // L2 (switch) properties
     swMode: 'dynamic',           // dynamic | access | trunk
