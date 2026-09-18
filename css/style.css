@@ -73,6 +73,98 @@ body {
 }
 .wrap { max-width: 1280px; margin: 0 auto; padding-block: 0 48px; padding-inline: 16px; }
 
+/* ---------- app shell: sidebar + content ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  max-width: 1680px;
+  margin: 0 auto;
+  align-items: start;
+}
+.content { min-width: 0; }
+.content .wrap { max-width: 1180px; margin: 0; padding-inline: 20px; }
+
+.sidebar {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  max-height: calc(100vh - 62px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  padding: 10px 0 28px;
+}
+.navtoggle { display: none; }
+
+.navlist { display: flex; flex-direction: column; }
+.navhome, .navrow {
+  font: inherit; text-align: left; cursor: pointer;
+  background: none; border: none; border-left: 3px solid transparent;
+  color: var(--text-dim); width: 100%;
+}
+.navhome {
+  font-size: 13px; font-weight: 600;
+  padding: 8px 16px 8px 17px; margin-bottom: 4px;
+}
+.navhome:hover, .navrow:hover { background: var(--panel-2); color: var(--text); }
+.navhome.active, .navrow.active {
+  background: var(--accent-soft); border-left-color: var(--accent); color: var(--text);
+}
+
+.navsection {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+  padding: 16px 16px 6px 17px; margin-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.navsection:first-of-type { border-top: none; margin-top: 0; }
+.navsection-title {
+  font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text);
+}
+.navsection-count {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums;
+}
+.navsection-sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--text-dim); line-height: 1.35; margin-top: 1px; }
+
+.navrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 8px;
+  padding: 7px 14px 7px 17px;
+}
+.navday {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--accent);
+}
+.navrow.active .navday { color: var(--accent); }
+.navtitle { grid-column: 1; font-size: 13px; line-height: 1.35; color: inherit; }
+.navrow.active .navtitle { font-weight: 600; }
+.navreps {
+  grid-row: 1 / span 2; align-self: center;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  background: var(--good-soft); color: var(--good);
+  border-radius: 999px; padding: 1px 7px; font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static; max-height: none; overflow: visible;
+    border-right: none; border-bottom: 1px solid var(--border); padding: 0;
+  }
+  .navtoggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%; font: inherit; font-size: 13.5px; font-weight: 600;
+    background: var(--panel); color: var(--text); border: none;
+    padding: 11px 16px; cursor: pointer;
+  }
+  .navtoggle .chev { color: var(--text-dim); transition: transform .15s; }
+  .navopen .navtoggle .chev { transform: rotate(180deg); }
+  .navlist { display: none; padding-bottom: 12px; max-height: 60vh; overflow-y: auto; }
+  .navopen .navlist { display: flex; }
+  .content .wrap { padding-inline: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .navtoggle .chev { transition: none; } }
+
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 h1, h2, h3 { text-wrap: balance; line-height: 1.25; }
@@ -163,7 +255,7 @@ code, kbd { font-family: var(--mono); font-size: .92em; background: var(--chip);
   display: grid; grid-template-columns: minmax(340px, 5fr) minmax(420px, 7fr);
   gap: 14px; align-items: start; margin-top: 10px;
 }
-@media (max-width: 900px) { .labgrid2 { grid-template-columns: 1fr; } }
+@media (max-width: 1140px) { .labgrid2 { grid-template-columns: 1fr; } }
 
 .pane {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);

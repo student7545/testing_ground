@@ -24,14 +24,78 @@ function buildTopo(lab) {
   return topo;
 }
 
+/* ---------- app shell: persistent sidebar + swappable content ---------- */
+const VOLUMES = [
+  { n: 1, title: 'Volume 1', sub: 'Fundamentals, Switching & Routing', note: 'JITL Days 1\u201332 \u00b7 Acing the CCNA Exam Vol 1' },
+  { n: 2, title: 'Volume 2', sub: 'ACLs, Services & Security', note: 'JITL Days 33+ \u00b7 Acing the CCNA Exam Vol 2' },
+];
+
+function shell() {
+  let sh = $('#shell');
+  if (!sh) {
+    const root = $('#app');
+    root.innerHTML = '';
+    sh = el('div', 'shell');
+    sh.id = 'shell';
+    const nav = el('aside', 'sidebar');
+    nav.id = 'sidebar';
+    const content = el('div', 'content');
+    content.id = 'content';
+    sh.append(nav, content);
+    root.appendChild(sh);
+  }
+  return sh;
+}
+
+function renderSidebar(activeId) {
+  const nav = $('#sidebar');
+  if (!nav) return;
+  nav.innerHTML = '';
+
+  const toggle = el('button', 'navtoggle', '<span>Labs</span><span class="chev">\u25be</span>');
+  toggle.addEventListener('click', () => $('#shell').classList.toggle('navopen'));
+  nav.appendChild(toggle);
+
+  const list = el('div', 'navlist');
+  const homeRow = el('button', 'navhome' + (activeId ? '' : ' active'), 'Overview &amp; progress');
+  homeRow.addEventListener('click', () => { location.hash = ''; closeNav(); });
+  list.appendChild(homeRow);
+
+  for (const v of VOLUMES) {
+    const labs = ND.LABS.filter(l => l.vol === v.n);
+    const doneCount = labs.filter(l => repsOf(l.id) > 0).length;
+    list.appendChild(el('div', 'navsection',
+      `<span class="navsection-title">${v.title}</span>` +
+      `<span class="navsection-count">${doneCount}/${labs.length}</span>` +
+      `<span class="navsection-sub">${v.sub}</span>`));
+    for (const lab of labs) {
+      const reps = repsOf(lab.id);
+      const row = el('button', 'navrow' + (lab.id === activeId ? ' active' : ''),
+        `<span class="navday">${lab.day}</span>` +
+        `<span class="navtitle">${lab.title}</span>` +
+        (reps ? `<span class="navreps" title="${reps} rep${reps > 1 ? 's' : ''} completed">${reps}</span>` : ''));
+      row.addEventListener('click', () => { location.hash = '#/lab/' + lab.id; closeNav(); });
+      list.appendChild(row);
+    }
+  }
+  nav.appendChild(list);
+}
+
+function closeNav() {
+  const sh = $('#shell');
+  if (sh) sh.classList.remove('navopen');
+}
+
 /* ---------- router ---------- */
 function route() {
+  shell();
   const h = location.hash;
   const m = h.match(/^#\/lab\/(.+)$/);
   if (m) {
     const lab = ND.LABS.find(l => l.id === m[1]);
-    if (lab) return renderLab(lab);
+    if (lab) { renderSidebar(lab.id); return renderLab(lab); }
   }
+  renderSidebar(null);
   renderHome();
 }
 window.addEventListener('hashchange', route);
@@ -39,7 +103,7 @@ window.addEventListener('hashchange', route);
 /* ---------- home ---------- */
 function renderHome() {
   S = null;
-  const app = $('#app');
+  const app = $('#content');
   const totalReps = Object.values(progress()).reduce((a, p) => a + (p.reps || 0), 0);
   const done = ND.LABS.filter(l => repsOf(l.id) > 0).length;
   app.innerHTML = '';
@@ -118,7 +182,7 @@ function renderLab(lab, keepState) {
     for (const d of lab.devices) S.termBufs[d.id] = [];
   }
   const drill = store.get('drill', false);
-  const app = $('#app');
+  const app = $('#content');
   app.innerHTML = '';
   const wrap = el('div', 'wrap');
 
@@ -534,7 +598,7 @@ function runChecks() {
   count.textContent = `${pass} / ${S.lab.checks.length}`;
   const banner = $('#donebanner');
   if (pass === S.lab.checks.length && S.lab.checks.length) {
-    if (!S.completedThisRun) { S.completedThisRun = true; addRep(S.lab.id); }
+    if (!S.completedThisRun) { S.completedThisRun = true; addRep(S.lab.id); renderSidebar(S.lab.id); }
     banner.innerHTML = '';
     const b = el('div', 'banner-done', `<span>✓ Lab complete — rep #${repsOf(S.lab.id)} logged.</span>`);
     const again = el('button', 'btn', 'Reset & run it again');
