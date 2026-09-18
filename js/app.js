@@ -119,32 +119,12 @@ function renderHome() {
       <span><b>${totalReps}</b> total reps</span>
     </div>`));
 
-  const vols = [
-    { n: 1, title: 'Volume 1 — Fundamentals, Switching & Routing', note: 'JITL Days 1–32 · Acing the CCNA Exam Vol 1' },
-    { n: 2, title: 'Volume 2 — ACLs, Services & Security', note: 'JITL Days 33+ · Acing the CCNA Exam Vol 2' },
-  ];
-  for (const v of vols) {
-    const head = el('div', 'volhead', `<h2>${v.title}</h2><span class="note">${v.note}</span>`);
-    wrap.appendChild(head);
-    const grid = el('div', 'labgrid');
-    for (const lab of ND.LABS.filter(l => l.vol === v.n)) {
-      const reps = repsOf(lab.id);
-      const card = el('div', 'labcard');
-      card.innerHTML = `<div class="day">${lab.day}</div><h3>${lab.title}</h3>
-        <div class="topics">${lab.topics}</div>
-        <div class="foot"><span class="repbadge ${reps ? 'done' : ''}">${reps ? reps + ' rep' + (reps > 1 ? 's' : '') : 'not started'}</span>
-        <span class="devchips">${lab.devices.map(d => `<span class="devchip">${d.id}</span>`).join('')}</span></div>`;
-      card.addEventListener('click', () => { location.hash = '#/lab/' + lab.id; });
-      grid.appendChild(card);
-    }
-    wrap.appendChild(grid);
-  }
-
   wrap.appendChild(el('section', 'howto', `
     <h2>How to use NetDrill</h2>
     <ul>
       <li><b>Repetition first.</b> Follow the steps exactly the first time. Then hit <i>Reset Lab</i> and do it again from the checklist alone. Then turn on <i>Drill Mode</i> (steps hidden) and run it purely from memory. Three clean drill-mode reps and the lab is yours.</li>
       <li><b>Terminal skills count.</b> Abbreviate everything (<code>conf t</code>, <code>int g0/1</code>, <code>sh ip int br</code>), lean on <kbd>?</kbd> and <kbd>Tab</kbd>, use <kbd>↑</kbd> for history, and <code>do</code> to run show commands from config mode.</li>
+      <li><b>Pick a lab</b> from the panel on the left — Volume 1 then Volume 2, in Jeremy's IT Lab day order. Work straight down the list.</li>
       <li><b>Switch consoles</b> with the device tabs above the terminal. PCs speak Windows-style: <code>ipconfig</code>, <code>ipconfig /renew</code>, <code>ping</code>, <code>tracert</code>.</li>
       <li><b>Checks grade live</b> after every command. The rep counter increments each time you take a lab from reset to all-green.</li>
       <li><b>Comprehension later, on your schedule.</b> Each lab's <i>Explanation</i> tab holds the theory — skip it while drilling, return when you're ready.</li>
@@ -166,7 +146,7 @@ function setTopbar(lab) {
   drillBtn.addEventListener('click', () => { store.set('drill', !store.get('drill', false)); renderLab(lab, true); });
   const resetBtn = el('button', 'btn danger', 'Reset Lab');
   resetBtn.addEventListener('click', () => resetLab(lab));
-  const homeBtn = el('button', 'btn', '← All Labs');
+  const homeBtn = el('button', 'btn', '← Overview');
   homeBtn.addEventListener('click', () => { location.hash = ''; });
   bar.append(homeBtn, drillBtn, resetBtn);
 }

@@ -202,40 +202,12 @@ code, kbd { font-family: var(--mono); font-size: .92em; background: var(--chip);
 .hero .stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 13.5px; }
 .hero .stats span b { font-size: 18px; color: var(--accent); font-variant-numeric: tabular-nums; }
 
-.volhead {
-  margin: 30px 0 4px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-}
-.volhead h2 { font-size: 20px; margin: 0; }
-.volhead .note { color: var(--text-dim); font-size: 13px; }
-
-.labgrid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 12px; margin-top: 12px;
-}
-.labcard {
-  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 6px;
-  box-shadow: var(--shadow); transition: border-color .12s;
-}
-.labcard:hover { border-color: var(--accent); }
-.labcard .day {
-  font-family: var(--mono); font-size: 11.5px; letter-spacing: .8px; text-transform: uppercase;
-  color: var(--accent); font-weight: 600;
-}
-.labcard h3 { margin: 0; font-size: 15.5px; }
-.labcard .topics { color: var(--text-dim); font-size: 13px; }
-.labcard .foot { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; }
 .repbadge {
   font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums;
   background: var(--chip); color: var(--text-dim); border-radius: 999px; padding: 2px 10px;
   white-space: nowrap;
 }
 .repbadge.done { background: var(--good-soft); color: var(--good); font-weight: 600; }
-.devchips { margin-left: auto; display: flex; gap: 4px; }
-.devchip {
-  font-family: var(--mono); font-size: 10.5px; background: var(--panel-2);
-  border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text-dim);
-}
 
 .howto {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
