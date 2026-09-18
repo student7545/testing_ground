@@ -96,6 +96,13 @@ body {
 }
 .navtoggle { display: none; }
 
+/* panel hidden via the top-bar toggle */
+.shell.navhidden { grid-template-columns: minmax(0, 1fr); }
+.shell.navhidden .sidebar { display: none; }
+.shell.navhidden .content .wrap { margin: 0 auto; }
+.navbtn { display: inline-flex; align-items: center; gap: 6px; }
+.navbtn-icon { color: var(--text-dim); font-weight: 700; letter-spacing: -1px; }
+
 .navlist { display: flex; flex-direction: column; }
 .navhome, .navrow {
   font: inherit; text-align: left; cursor: pointer;

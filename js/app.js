@@ -86,9 +86,39 @@ function closeNav() {
   if (sh) sh.classList.remove('navopen');
 }
 
+/* Hide/show the lab panel. Lives in the top bar so it is reachable even
+   when the panel itself is hidden. State persists per browser. */
+function navHidden() { return store.get('navHidden', false); }
+
+function setNavHidden(hidden) {
+  store.set('navHidden', hidden);
+  const sh = $('#shell');
+  if (sh) { sh.classList.toggle('navhidden', hidden); if (hidden) sh.classList.remove('navopen'); }
+  const btn = $('#navbtn');
+  if (btn) {
+    btn.innerHTML = `<span class="navbtn-icon">${hidden ? '\u203a\u203a' : '\u2039\u2039'}</span>${hidden ? 'Show labs' : 'Hide labs'}`;
+    btn.setAttribute('aria-expanded', String(!hidden));
+  }
+}
+
+function ensureNavButton() {
+  if ($('#navbtn')) return;
+  const bar = document.querySelector('.topbar');
+  if (!bar) return;
+  const btn = el('button', 'btn small navbtn');
+  btn.id = 'navbtn';
+  btn.type = 'button';
+  btn.setAttribute('aria-controls', 'sidebar');
+  btn.addEventListener('click', () => setNavHidden(!navHidden()));
+  const spacer = bar.querySelector('.spacer');
+  bar.insertBefore(btn, spacer || null);
+}
+
 /* ---------- router ---------- */
 function route() {
   shell();
+  ensureNavButton();
+  setNavHidden(navHidden());
   const h = location.hash;
   const m = h.match(/^#\/lab\/(.+)$/);
   if (m) {
@@ -143,8 +173,12 @@ function setTopbar(lab) {
   if (!lab) return;
   const drill = store.get('drill', false);
   const drillBtn = el('button', 'btn' + (drill ? ' primary' : ''), drill ? 'Drill Mode: ON' : 'Drill Mode: OFF');
+  drillBtn.title = drill
+    ? 'Drill Mode is ON: the step-by-step instructions are hidden. Work from the task list and the live checks alone. Click to show the steps again.'
+    : 'Drill Mode: hides the step-by-step instructions so you run the lab from the task list and live checks alone \u2014 for practising from memory.';
   drillBtn.addEventListener('click', () => { store.set('drill', !store.get('drill', false)); renderLab(lab, true); });
   const resetBtn = el('button', 'btn danger', 'Reset Lab');
+  resetBtn.title = 'Wipe all devices back to factory defaults so you can run this lab again from scratch. Your rep count is kept.';
   resetBtn.addEventListener('click', () => resetLab(lab));
   const homeBtn = el('button', 'btn', '← Overview');
   homeBtn.addEventListener('click', () => { location.hash = ''; });
