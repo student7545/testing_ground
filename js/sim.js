@@ -50,14 +50,15 @@ ND.l2Endpoints = function (topo, dev, ifc) {
     if (!inIfc || !ND.ifaceUp(topo, d, inIfc)) return;
     if (d.type === 'switch' && !inIfc.noSwitchport) {
       if (!bundleOk(d, inIfc)) return;
-      const mode = ND.operMode(topo, d, inIfc);
+      const l2 = ND.l2Settings(d, inIfc);
+      const mode = ND.operMode(topo, d, l2);
       let vlan;
       if (mode === 'access') {
-        if (frameTag !== null && frameTag !== inIfc.accessVlan) return;
-        vlan = inIfc.accessVlan;
+        if (frameTag !== null && frameTag !== l2.accessVlan) return;
+        vlan = l2.accessVlan;
       } else {
-        vlan = frameTag === null ? inIfc.nativeVlan : frameTag;
-        if (!ND.allowedOnTrunk(inIfc, vlan)) return;
+        vlan = frameTag === null ? l2.nativeVlan : frameTag;
+        if (!ND.allowedOnTrunk(l2, vlan)) return;
       }
       if (!d.vlans[vlan]) return; // vlan not created on this switch
       floodSwitch(d, vlan, ifName);
@@ -94,14 +95,23 @@ ND.l2Endpoints = function (topo, dev, ifc) {
       if (out.name === inPort || out.noSwitchport) continue;
       if (!/^(Gigabit|Fast|Ten|Ether)/.test(out.name)) continue;
       if (!ND.ifaceUp(topo, sw, out) || !bundleOk(sw, out)) continue;
-      const mode = ND.operMode(topo, sw, out);
+      const outL2 = ND.l2Settings(sw, out);
+      const mode = ND.operMode(topo, sw, outL2);
       let egressTag = null;
-      if (mode === 'access') { if (out.accessVlan !== vlan) continue; egressTag = null; }
-      else { if (!ND.allowedOnTrunk(out, vlan)) continue; egressTag = out.nativeVlan === vlan ? null : vlan; }
+      if (mode === 'access') { if (outL2.accessVlan !== vlan) continue; egressTag = null; }
+      else { if (!ND.allowedOnTrunk(outL2, vlan)) continue; egressTag = outL2.nativeVlan === vlan ? null : vlan; }
       const peer = ND.linkPeer(topo, sw, out.name);
       if (peer) arrive(peer.dev, peer.iface, egressTag);
     }
   }
+};
+
+/* A port in a channel-group takes its layer-2 settings from the Port-channel
+   interface, exactly as IOS applies them to every bundle member. */
+ND.l2Settings = function (dev, ifc) {
+  if (!ifc.channelGroup) return ifc;
+  const po = dev.ifaces['Port-channel' + ifc.channelGroup.id];
+  return po || ifc;
 };
 
 ND.channelForms = function (a, b) {
@@ -359,8 +369,10 @@ ND.aclCheck = function (dev, aclId, pkt) {
   }
   function portMatch(e, port) {
     if (e.portOp === 'eq') return port === e.dstPort;
+    if (e.portOp === 'neq') return port !== e.dstPort;
     if (e.portOp === 'gt') return port > e.dstPort;
     if (e.portOp === 'lt') return port < e.dstPort;
+    if (e.portOp === 'range') return port >= e.dstPort && port <= e.dstPortHi;
     return true;
   }
 };
@@ -408,7 +420,7 @@ ND.tracePacket = function (topo, srcDev, dstIp, pkt, checkReverse = true) {
     if (inAcl && !ND.aclCheck(nxt.dev, inAcl, { ...pkt, dst: dstIp })) return { ok: false, reason: 'acl', at: nxt.dev.id, path, srcIp };
     // vty access-class for telnet/ssh handled by caller
     path.push(nxt.dev.id);
-    if (pkt.learn) ND.learnMacs(topo, cur, exitIfc, nxt.dev, nxt.ifc);
+    if (pkt.learn) { ND.learnMacs(topo, cur, exitIfc, nxt.dev, nxt.ifc); ND.learnArp(topo, cur, exitIfc, nxt, targetIp, srcIp); }
     if (ND.devIps(topo, nxt.dev).some(a => a.ip === dstIp)) {
       if (checkReverse && srcIp) {
         const back = ND.tracePacket(topo, nxt.dev, srcIp, { proto: pkt.proto, src: dstIp }, false);
@@ -421,6 +433,20 @@ ND.tracePacket = function (topo, srcDev, dstIp, pkt, checkReverse = true) {
     cur = nxt.dev;
   }
   return { ok: false, reason: 'ttl', path, srcIp };
+};
+
+/* ARP caching: a host or router that just forwarded a packet knows the MAC of
+   the next hop, and the next hop knows its own sender in return. */
+ND.arpAdd = function (dev, ip, mac, ifName) {
+  if (!ip || !mac) return;
+  dev.arpTable = dev.arpTable.filter(e => e.ip !== ip);
+  dev.arpTable.push({ ip, mac, iface: ifName, age: 0 });
+};
+ND.learnArp = function (topo, cur, exitIfc, nxt, targetIp, srcIp) {
+  ND.arpAdd(cur, targetIp, nxt.ifc.mac, exitIfc.name);
+  // the far end learns whoever just spoke to it
+  const backIp = cur.type === 'pc' ? ND.pcNet(topo, cur).ip : (exitIfc.ip ? exitIfc.ip.addr : srcIp);
+  if (nxt.dev.type !== 'switch') ND.arpAdd(nxt.dev, backIp, exitIfc.mac, nxt.ifc.name);
 };
 
 /* Which physical port on `sw` leads toward `target`? Breadth-first over the

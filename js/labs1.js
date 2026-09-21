@@ -31,7 +31,7 @@ const L = lab => ND.LABS.push(lab);
 
 /* ============================================================= */
 L({
-  id: 'd04-cli-basics', vol: 1, day: 'Day 4', title: 'CLI Basics & Device Security',
+  id: 'd04-cli-basics', ord: 4, vol: 1, day: 'Day 4', title: 'CLI Basics & Device Security',
   topics: 'CLI modes · hostname · enable secret · service password-encryption · saving configs',
   devices: [{ id: 'SW1', type: 'switch', ifaces: ['g0/1', 'g0/2', 'f0/1', 'f0/2'] }],
   links: [], layout: { SW1: [190, 40] },
@@ -75,7 +75,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd06-mac-tables', vol: 1, day: 'Day 6', title: 'Ethernet Switching & MAC Tables',
+  id: 'd06-mac-tables', ord: 6, vol: 1, day: 'Day 6', title: 'Ethernet Switching & MAC Tables',
   topics: 'MAC learning · show mac address-table · clear mac address-table',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'g0/1'] },
@@ -115,7 +115,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd08-router-ints', vol: 1, day: 'Day 8', title: 'Router Interfaces & IPv4 Addressing',
+  id: 'd08-router-ints', ord: 8, vol: 1, day: 'Day 8', title: 'Router Interfaces & IPv4 Addressing',
   topics: 'ip address · no shutdown · description · show ip interface brief',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -156,7 +156,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd09-switch-ints', vol: 1, day: 'Day 9', title: 'Switch Interface Configuration',
+  id: 'd09-switch-ints', ord: 9, vol: 1, day: 'Day 9', title: 'Switch Interface Configuration',
   topics: 'interface range · speed · duplex · shutting down unused ports',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'f0/3', 'f0/4', 'f0/5', 'f0/6', 'g0/1'] },
@@ -193,7 +193,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd11-static-routing', vol: 1, day: 'Day 11', title: 'Static & Default Routes',
+  id: 'd11-static-routing', ord: 11, vol: 1, day: 'Day 11', title: 'Static & Default Routes',
   topics: 'ip route · default route · show ip route',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -238,7 +238,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd16-vlans1', vol: 1, day: 'Day 16', title: 'VLANs Part 1 — Access Ports',
+  id: 'd16-vlans1', ord: 16, vol: 1, day: 'Day 16', title: 'VLANs Part 1 — Access Ports',
   topics: 'vlan · name · switchport mode access · switchport access vlan',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'f0/3', 'f0/4'] },
@@ -283,7 +283,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd17-vlans2', vol: 1, day: 'Day 17', title: 'VLANs Part 2 — Trunking',
+  id: 'd17-vlans2', ord: 17, vol: 1, day: 'Day 17', title: 'VLANs Part 2 — Trunking',
   topics: 'switchport mode trunk · native vlan · allowed vlan · show interfaces trunk',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'g0/1'] },
@@ -330,7 +330,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd18-vlans3', vol: 1, day: 'Day 18', title: 'VLANs Part 3 — Router on a Stick',
+  id: 'd18-vlans3', ord: 18, vol: 1, day: 'Day 18', title: 'VLANs Part 3 — Router on a Stick',
   topics: 'subinterfaces · encapsulation dot1q · inter-VLAN routing',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0'] },
@@ -373,7 +373,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd19-dtp-vtp', vol: 1, day: 'Day 19', title: 'DTP & VTP',
+  id: 'd19-dtp-vtp', ord: 19, vol: 1, day: 'Day 19', title: 'DTP & VTP',
   topics: 'dynamic desirable/auto · switchport nonegotiate · vtp mode transparent',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['g0/1', 'g0/2'] },
@@ -413,7 +413,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd21-stp', vol: 1, day: 'Days 20-21', title: 'Spanning Tree Protocol',
+  id: 'd21-stp', ord: 20, vol: 1, day: 'Days 20-21', title: 'Spanning Tree Protocol',
   topics: 'rapid-pvst · root bridge priority · portfast · bpduguard',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['g0/1', 'g0/2', 'f0/1'] },
@@ -456,7 +456,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd22-etherchannel', vol: 1, day: 'Day 22', title: 'EtherChannel',
+  id: 'd22-etherchannel', ord: 22, vol: 1, day: 'Day 22', title: 'EtherChannel',
   topics: 'channel-group · LACP active/passive · trunking the port-channel',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['g0/1', 'g0/2', 'f0/1'] },
@@ -497,7 +497,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd27-ospf', vol: 1, day: 'Days 25-27', title: 'OSPF Single Area',
+  id: 'd27-ospf', ord: 27, vol: 1, day: 'Days 25-27', title: 'OSPF Single Area',
   topics: 'router ospf · network statements · router-id · passive-interface · default-information originate',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1', 'lo0'] },
@@ -553,7 +553,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd28-hsrp', vol: 1, day: 'Day 28', title: 'First Hop Redundancy — HSRP',
+  id: 'd28-hsrp', ord: 28, vol: 1, day: 'Day 28', title: 'First Hop Redundancy — HSRP',
   topics: 'standby ip · priority · preempt · show standby brief',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0'] },
@@ -594,7 +594,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd32-ipv6', vol: 1, day: 'Days 30-32', title: 'IPv6 Addressing & Static Routes',
+  id: 'd32-ipv6', ord: 32, vol: 1, day: 'Days 30-32', title: 'IPv6 Addressing & Static Routes',
   topics: 'ipv6 unicast-routing · ipv6 address · eui-64 · ipv6 route',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },

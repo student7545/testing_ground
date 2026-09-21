@@ -9,7 +9,7 @@ const L = lab => ND.LABS.push(lab);
 
 /* ============================================================= */
 L({
-  id: 'y1-acls', vol: 2, tier: 'deep', day: 'Days 33-34', title: 'Access Lists — Full Drill',
+  id: 'y1-acls', ord: 700, vol: 1, tier: 'deep', day: 'Days 33-34', title: 'Access Lists — Full Drill',
   topics: '2 routers · numbered & named · standard & extended · host/any/wildcards · tcp/udp/icmp · ports · sequence numbers & insertion · in/out · vty access-class · removal',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1', 'g0/2'] },
@@ -140,7 +140,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'y2-nat', vol: 2, tier: 'deep', day: 'Days 43-44', title: 'NAT & PAT — Full Drill',
+  id: 'y2-nat', ord: 100, vol: 2, tier: 'deep', day: 'Days 43-44', title: 'NAT & PAT — Full Drill',
   topics: '2 edge routers · inside/outside domains · multiple static mappings · ACL classifiers · PAT overload · translation table · removal and rebuild',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -255,7 +255,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'y3-dhcp', vol: 2, tier: 'deep', day: 'Days 38, 48', title: 'DHCP Server, Relay & Snooping — Full Drill',
+  id: 'y3-dhcp', ord: 200, vol: 2, tier: 'deep', day: 'Days 38, 48', title: 'DHCP Server, Relay & Snooping — Full Drill',
   topics: '3 pools · single and range exclusions · every pool option · 2 relay agents · bindings · pool removal · snooping with trusted ports',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1', 'g0/2'] },
@@ -394,7 +394,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'y4-switch-security', vol: 2, tier: 'deep', day: 'Days 41, 47', title: 'SSH & Port Security — Full Drill',
+  id: 'y4-switch-security', ord: 300, vol: 2, tier: 'deep', day: 'Days 41, 47', title: 'SSH & Port Security — Full Drill',
   topics: 'the five SSH prerequisites built 3 times · deliberate prerequisite errors · vty hardening with access-class · port security on 6 ports · all three violation modes · sticky and static MACs',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'f0/3', 'f0/4', 'f0/5', 'f0/6', 'g0/1'] },
@@ -520,7 +520,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'y5-mgmt-services', vol: 2, tier: 'deep', day: 'Days 35-40', title: 'NTP, Syslog & Discovery — Full Drill',
+  id: 'y5-mgmt-services', ord: 400, vol: 2, tier: 'deep', day: 'Days 35-40', title: 'NTP, Syslog & Discovery — Full Drill',
   topics: 'NTP master and a client chain · every syslog destination and severity · CDP global vs per-interface · LLDP · repeated across 5 devices',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -651,7 +651,7 @@ L({
 });
 /* ============================================================= */
 L({
-  id: 'y6-troubleshooting', vol: 2, tier: 'deep', day: 'Capstone', title: 'Troubleshooting Gauntlet — Full Drill',
+  id: 'y6-troubleshooting', ord: 500, vol: 2, tier: 'deep', day: 'Capstone', title: 'Troubleshooting Gauntlet — Full Drill',
   topics: 'eleven planted faults across layers 1-3 · access VLAN · trunk allowed list · missing VLAN · err-disabled port · ROAS encapsulation & addressing · shut interface · /30 mismatch · wrong next hop · missing return routes · ACL · structured diagnosis and repair',
   devices: [
     { id: 'PC1', type: 'pc', ifaces: ['e0'], pc: { ip: '10.0.10.10', mask: '255.255.255.0', gw: '10.0.10.1' } },

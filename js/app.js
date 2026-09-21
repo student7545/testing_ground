@@ -30,8 +30,8 @@ const TIERS = [
   { key: 'deep', label: 'Comprehensive', note: 'every command, in depth' },
 ];
 const VOLUMES = [
-  { n: 1, title: 'Volume 1', sub: 'Fundamentals, Switching & Routing', note: 'JITL Days 1\u201332 \u00b7 Acing the CCNA Exam Vol 1' },
-  { n: 2, title: 'Volume 2', sub: 'ACLs, Services & Security', note: 'JITL Days 33+ \u00b7 Acing the CCNA Exam Vol 2' },
+  { n: 1, title: 'Volume 1', sub: 'Fundamentals, Switching, Routing & ACLs', note: 'JITL Days 1\u201334 \u00b7 Acing the CCNA Exam Vol 1' },
+  { n: 2, title: 'Volume 2', sub: 'Services, Security, Architectures, Wireless & Automation', note: 'JITL Days 35+ \u00b7 Acing the CCNA Exam Vol 2' },
 ];
 
 function shell() {
@@ -73,7 +73,7 @@ function renderSidebar(activeId) {
       `<span class="navsection-count">${doneCount}/${labs.length}</span>` +
       `<span class="navsection-sub">${v.sub}</span>`));
     for (const tier of TIERS) {
-      const tierLabs = labs.filter(l => (l.tier || 'core') === tier.key);
+      const tierLabs = labs.filter(l => (l.tier || 'core') === tier.key).sort((a, b) => (a.ord || 0) - (b.ord || 0));
       if (!tierLabs.length) continue;
       list.appendChild(el('div', 'navsub', `${tier.label}<span class="navsub-note">${tier.note}</span>`));
       for (const lab of tierLabs) {

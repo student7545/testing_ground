@@ -12,6 +12,7 @@ ND.promptFor = function (dev) {
   if (dev.type === 'pc') return `C:\\> `;
   const s = dev.sess;
   if (s.pendingAuth) return 'Password: ';
+  if (s.pendingPrompt) return s.pendingPrompt.text;
   let mode = s.mode;
   if (mode === 'if' && s.ifaceRange && s.ifaceRange.length === 1 && s.ifaceRange[0].name.includes('.')) mode = 'subif';
   return dev.hostname + (ND.PROMPT_SUFFIX[mode] || '>');
@@ -118,6 +119,14 @@ ND.execLine = function (topo, dev, rawLine, out) {
         if (auth.tries >= 3) { s.pendingAuth = null; out('% Bad secrets', 'err'); }
       }
     }
+    return;
+  }
+
+  // a command that asked a question (copy to tftp, and friends) takes this line as its answer
+  if (s.pendingPrompt) {
+    const p = s.pendingPrompt;
+    s.pendingPrompt = null;
+    p.fn(line.trim(), { topo, dev, out, s });
     return;
   }
 
@@ -285,7 +294,12 @@ cmd(['priv'], 'terminal length NUM', 'Set number of lines on a screen', () => {}
 
 /* ---- ping / traceroute ---- */
 function doPing(c, ip) {
-  if (!ND.isIp(ip)) { c.out('Translating "' + ip + '"...domain server (255.255.255.255)\n% Unrecognized host or address.', 'err'); return; }
+  if (!ND.isIp(ip)) {
+    const r = ND.resolveName(c.topo, c.dev, ip);
+    if (!r) { c.out('Translating "' + ip + '"...domain server (255.255.255.255)\n% Unrecognized host or address.', 'err'); return; }
+    c.out(`Translating "${ip}"...domain server (${r.via})\n[OK]`);
+    ip = r.ip;
+  }
   const res = ND.tracePacket(c.topo, c.dev, ip, { proto: 'icmp', learn: true });
   c.out('Type escape sequence to abort.');
   c.out(`Sending 5, 100-byte ICMP Echos to ${ip}, timeout is 2 seconds:`);
@@ -295,8 +309,12 @@ function doPing(c, ip) {
 }
 cmd(['exec', 'priv'], 'ping WORD', 'Send echo messages', (c, a) => doPing(c, a[0]));
 cmd(['exec', 'priv'], 'traceroute WORD', 'Trace route to destination', (c, a) => {
-  const ip = a[0];
-  if (!ND.isIp(ip)) return c.out('% Unrecognized host or address.', 'err');
+  let ip = a[0];
+  if (!ND.isIp(ip)) {
+    const r = ND.resolveName(c.topo, c.dev, ip);
+    if (!r) return c.out('% Unrecognized host or address.', 'err');
+    ip = r.ip;
+  }
   const res = ND.tracePacket(c.topo, c.dev, ip, { proto: 'icmp', learn: true });
   c.out(`Type escape sequence to abort.\nTracing the route to ${ip}\n`);
   if (res.ok) {

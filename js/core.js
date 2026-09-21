@@ -96,6 +96,7 @@ ND.makeDevice = function (opts) {
   const dev = {
     id: opts.id, type: opts.type,                 // router | switch | pc
     l3switch: !!opts.l3switch,
+    poeDevice: opts.poeDevice || null,           // e.g. an IP phone or access point drawing PoE
     hostname: opts.type === 'router' ? 'Router' : opts.type === 'switch' ? 'Switch' : opts.id,
     ifaces: {}, vlans: { 1: { name: 'default' } },
     enableSecret: null, enablePassword: null, svcEnc: false,
@@ -117,7 +118,17 @@ ND.makeDevice = function (opts) {
     vtp: { mode: 'server', domain: null },
     stp: { mode: 'pvst', prio: {}, portfastDefault: false, bpduguardDefault: false },
     cdp: true, lldp: false,
-    macTable: [],
+    macTable: [], arpTable: [],
+    // services
+    hosts: {},                                    // static DNS entries: name -> ip
+    snmp: { communities: [], location: null, contact: null, hosts: [], traps: false },
+    arai: { vlans: [], validate: [] },            // dynamic ARP inspection
+    qos: { enabled: false },
+    aaa: { newModel: false, loginDefault: null },
+    services: { http: true, httpSecure: true, loginBlock: null, minPassLen: null, ftpUser: null, ftpPass: null },
+    flash: opts.type === 'switch'
+      ? [{ name: 'c2960-lanbasek9-mz.150-2.SE4.bin', size: 11801088 }, { name: 'vlan.dat', size: 3096 }, { name: 'config.text', size: 1915 }]
+      : [{ name: 'c2900-universalk9-mz.SPA.157-3.M4.bin', size: 33591768 }, { name: 'cpconfig-29xx.cfg', size: 3000 }],
     startup: null, saved: false,
     // PC-only network config
     pcCfg: opts.type === 'pc' ? { ip: null, mask: null, gw: null, dhcp: !!opts.dhcp, dns: null } : null,

@@ -246,14 +246,23 @@ function parseExt(raw) {
   if (!src) return null;
   // optional source port
   let srcOp = null, srcPort = null;
-  if (toks[0] && ['eq', 'gt', 'lt', 'range'].includes(toks[0].toLowerCase())) { srcOp = toks.shift().toLowerCase(); srcPort = portNum(toks.shift()); }
+  let srcPortHi = null;
+  if (toks[0] && ['eq', 'gt', 'lt', 'neq', 'range'].includes(toks[0].toLowerCase())) {
+    srcOp = toks.shift().toLowerCase(); srcPort = portNum(toks.shift());
+    if (srcOp === 'range') srcPortHi = portNum(toks.shift());
+  }
   const dst = parseAddr(toks);
   if (!dst) return null;
-  let portOp = null, dstPort = null;
-  if (toks[0] && ['eq', 'gt', 'lt'].includes(toks[0].toLowerCase())) { portOp = toks.shift().toLowerCase(); dstPort = portNum(toks.shift()); if (dstPort == null) return null; }
-  if (toks.length && !['established', 'log'].includes(toks[0])) return null;
-  const portTxt = portOp ? ` ${portOp} ${portName(dstPort)}` : '';
-  return { action, proto, src, dst, portOp, dstPort, raw: `${action} ${proto} ${src.txt} ${dst.txt}${portTxt}` };
+  let portOp = null, dstPort = null, dstPortHi = null;
+  if (toks[0] && ['eq', 'gt', 'lt', 'neq', 'range'].includes(toks[0].toLowerCase())) {
+    portOp = toks.shift().toLowerCase(); dstPort = portNum(toks.shift()); if (dstPort == null) return null;
+    if (portOp === 'range') { dstPortHi = portNum(toks.shift()); if (dstPortHi == null) return null; }
+  }
+  const established = toks.includes('established');
+  if (toks.length && !toks.every(t => ['established', 'log'].includes(t))) return null;
+  const portTxt = portOp ? (portOp === 'range' ? ` range ${portName(dstPort)} ${portName(dstPortHi)}` : ` ${portOp} ${portName(dstPort)}`) : '';
+  return { action, proto, src, dst, portOp, dstPort, dstPortHi, srcOp, srcPort, srcPortHi, established,
+    raw: `${action} ${proto} ${src.txt} ${dst.txt}${portTxt}${established ? ' established' : ''}` };
 }
 function portNum(t) {
   if (t == null) return null;

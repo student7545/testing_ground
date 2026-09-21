@@ -10,7 +10,7 @@ const L = lab => ND.LABS.push(lab);
 
 /* ============================================================= */
 L({
-  id: 'x1-device-mgmt', vol: 1, tier: 'deep', day: 'Days 4-5', title: 'Device Setup & Management — Full Drill',
+  id: 'x1-device-mgmt', ord: 100, vol: 1, tier: 'deep', day: 'Days 4-5', title: 'Device Setup & Management — Full Drill',
   topics: 'every CLI mode · secret vs password · console & vty lines · exec-timeout · banners · NVRAM · reload · every show command — repeated across 5 devices',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'g0/1'] },
@@ -151,7 +151,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'x2-interfaces', vol: 1, tier: 'deep', day: 'Days 8-9', title: 'Interfaces & Addressing — Full Drill',
+  id: 'x2-interfaces', ord: 200, vol: 1, tier: 'deep', day: 'Days 8-9', title: 'Interfaces & Addressing — Full Drill',
   topics: 'physical · loopback · SVI · routed port · subinterface · every range form · speed/duplex · all three status wordings · every show command',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1', 'g0/2'] },
@@ -291,7 +291,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'x3-vlans', vol: 1, tier: 'deep', day: 'Days 16-19', title: 'VLANs, Trunking & Inter-VLAN — Full Drill',
+  id: 'x3-vlans', ord: 300, vol: 1, tier: 'deep', day: 'Days 16-19', title: 'VLANs, Trunking & Inter-VLAN — Full Drill',
   topics: '3 VLANs across 3 switches · create/name/delete · access & voice · DTP · 4 trunks · every allowed-list form · native VLAN · VTP · 3 subinterfaces',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'f0/3', 'f0/4', 'g0/1', 'g0/2'] },
@@ -434,7 +434,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'x4-stp-etherchannel', vol: 1, tier: 'deep', day: 'Days 20-22', title: 'STP & EtherChannel — Full Drill',
+  id: 'x4-stp-etherchannel', ord: 400, vol: 1, tier: 'deep', day: 'Days 20-22', title: 'STP & EtherChannel — Full Drill',
   topics: '4 switches · pvst vs rapid-pvst · explicit priority & both macros · per-VLAN roots · portfast/bpduguard per-port and global · 3 bundles using LACP, PAgP and ON',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'g0/1', 'g0/2'] },
@@ -579,7 +579,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'x5-static-ipv6', vol: 1, tier: 'deep', day: 'Days 11, 30-32', title: 'Static Routing & IPv6 — Full Drill',
+  id: 'x5-static-ipv6', ord: 500, vol: 1, tier: 'deep', day: 'Days 11, 30-32', title: 'Static Routing & IPv6 — Full Drill',
   topics: '4 routers · next-hop vs exit-interface · floating statics · host routes · summary routes · longest prefix match · IPv6 manual/EUI-64/link-local/enable · IPv6 statics & default',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1', 'g0/2', 'lo0'] },
@@ -732,7 +732,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'x6-ospf-hsrp', vol: 1, tier: 'deep', day: 'Days 25-28', title: 'OSPF & HSRP — Full Drill',
+  id: 'x6-ospf-hsrp', ord: 600, vol: 1, tier: 'deep', day: 'Days 25-28', title: 'OSPF & HSRP — Full Drill',
   topics: '5 routers · network statements vs interface mode · router-id · passive default · cost/priority/point-to-point · reference bandwidth · maximum-paths · default-information originate · HSRPv2 two groups',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1', 'lo0'] },

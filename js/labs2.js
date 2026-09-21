@@ -6,7 +6,7 @@ const L = lab => ND.LABS.push(lab);
 
 /* ============================================================= */
 L({
-  id: 'd33-std-acl', vol: 2, day: 'Day 33', title: 'Standard ACLs',
+  id: 'd33-std-acl', ord: 33, vol: 1, day: 'Day 33', title: 'Standard ACLs',
   topics: 'access-list 1-99 · named standard ACLs · placement close to destination',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1', 'g0/2'] },
@@ -54,7 +54,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd34-ext-acl', vol: 2, day: 'Day 34', title: 'Extended ACLs',
+  id: 'd34-ext-acl', ord: 34, vol: 1, day: 'Day 34', title: 'Extended ACLs',
   topics: 'named extended ACLs · protocol + port matching · placement close to source',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -100,7 +100,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd35-cdp-lldp', vol: 2, day: 'Day 35', title: 'CDP & LLDP',
+  id: 'd35-cdp-lldp', ord: 35, vol: 2, day: 'Day 35', title: 'CDP & LLDP',
   topics: 'show cdp neighbors · disabling CDP · enabling LLDP',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -142,7 +142,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd36-ntp', vol: 2, day: 'Day 36', title: 'NTP',
+  id: 'd36-ntp', ord: 36, vol: 2, day: 'Day 36', title: 'NTP',
   topics: 'ntp server · ntp master · stratum · show ntp status',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0'] },
@@ -182,7 +182,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd38-dhcp', vol: 2, day: 'Day 38', title: 'DHCP Server & Relay',
+  id: 'd38-dhcp', ord: 38, vol: 2, day: 'Day 38', title: 'DHCP Server & Relay',
   topics: 'ip dhcp pool · excluded-address · ip helper-address',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -237,7 +237,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd40-syslog', vol: 2, day: 'Day 40', title: 'Syslog',
+  id: 'd40-syslog', ord: 40, vol: 2, day: 'Day 40', title: 'Syslog',
   topics: 'logging host · logging trap · logging buffered · severity levels',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0'] },
@@ -277,7 +277,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd41-ssh', vol: 2, day: 'Day 41', title: 'SSH',
+  id: 'd41-ssh', ord: 41, vol: 2, day: 'Day 41', title: 'SSH',
   topics: 'domain name · crypto key generate rsa · ip ssh version 2 · vty hardening',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'g0/1'] },
@@ -320,7 +320,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd43-static-nat', vol: 2, day: 'Day 43', title: 'NAT Part 1 — Static NAT',
+  id: 'd43-static-nat', ord: 43, vol: 2, day: 'Day 43', title: 'NAT Part 1 — Static NAT',
   topics: 'ip nat inside/outside · ip nat inside source static',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -364,7 +364,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd44-pat', vol: 2, day: 'Day 44', title: 'NAT Part 2 — PAT (Overload)',
+  id: 'd44-pat', ord: 44, vol: 2, day: 'Day 44', title: 'NAT Part 2 — PAT (Overload)',
   topics: 'ACL-defined inside sources · ip nat inside source list … overload',
   devices: [
     { id: 'R1', type: 'router', ifaces: ['g0/0', 'g0/1'] },
@@ -409,7 +409,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd47-port-security', vol: 2, day: 'Day 47', title: 'Port Security',
+  id: 'd47-port-security', ord: 47, vol: 2, day: 'Day 47', title: 'Port Security',
   topics: 'switchport port-security · maximum · violation modes · sticky MACs',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'g0/1'] },
@@ -453,7 +453,7 @@ L({
 
 /* ============================================================= */
 L({
-  id: 'd48-dhcp-snooping', vol: 2, day: 'Day 48', title: 'DHCP Snooping',
+  id: 'd48-dhcp-snooping', ord: 48, vol: 2, day: 'Day 48', title: 'DHCP Snooping',
   topics: 'ip dhcp snooping · vlan scoping · trusted ports',
   devices: [
     { id: 'SW1', type: 'switch', ifaces: ['f0/1', 'f0/2', 'g0/1'] },

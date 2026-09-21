@@ -32,6 +32,24 @@ ND.runningConfig = function (topo, dev) {
     L.push('ip dhcp snooping');
     if (dev.dhcp.snooping.vlans.length) L.push(`ip dhcp snooping vlan ${ND.fmtVlanList(dev.dhcp.snooping.vlans)}`);
   }
+  if (dev.arai && dev.arai.vlans.length) L.push(`ip arp inspection vlan ${ND.fmtVlanList(dev.arai.vlans)}`);
+  if (dev.arai && dev.arai.validate.length) L.push(`ip arp inspection validate ${dev.arai.validate.join(' ')}`);
+  if (dev.qos && dev.qos.enabled) L.push('mls qos');
+  if (dev.mgmt && dev.mgmt.netconf) L.push('netconf-yang');
+  if (dev.mgmt && dev.mgmt.restconf) L.push('restconf');
+  if (dev.aaa && dev.aaa.newModel) L.push('aaa new-model');
+  if (dev.aaa && dev.aaa.loginDefault) L.push(`aaa authentication login default ${dev.aaa.loginDefault === 'local' ? 'local' : 'group ' + dev.aaa.loginDefault.replace(' local', '') + ' local'}`);
+  for (const n of dev.nameServers) L.push(`ip name-server ${n}`);
+  for (const [h, ip] of Object.entries(dev.hosts || {})) L.push(`ip host ${h} ${ip}`);
+  if (dev.services) {
+    const sv = dev.services;
+    if (sv.loginBlock) L.push(`login block-for ${sv.loginBlock.blockFor} attempts ${sv.loginBlock.attempts} within ${sv.loginBlock.within}`);
+    if (sv.minPassLen) L.push(`security passwords min-length ${sv.minPassLen}`);
+    if (sv.ftpUser) L.push(`ip ftp username ${sv.ftpUser}`);
+    if (sv.ftpPass) L.push(`ip ftp password ${sv.ftpPass}`);
+    if (!sv.http) L.push('no ip http server');
+    if (!sv.httpSecure) L.push('no ip http secure-server');
+  }
   for (const [lo, hi] of dev.dhcp.excluded) L.push(`ip dhcp excluded-address ${lo}${hi ? ' ' + hi : ''}`);
   for (const p of Object.values(dev.dhcp.pools)) {
     L.push(`ip dhcp pool ${p.name}`);
@@ -102,8 +120,21 @@ ND.runningConfig = function (topo, dev) {
     if (i.duplex !== 'auto') L.push(` duplex ${i.duplex}`);
     if (!i.cdpEnabled) L.push(' no cdp enable');
     if (i.snoopTrust) L.push(' ip dhcp snooping trust');
+    if (i.araiTrust) L.push(' ip arp inspection trust');
+    if (i.araiRate) L.push(` ip arp inspection limit rate ${i.araiRate}`);
+    if (i.qosTrust) L.push(` mls qos trust ${i.qosTrust}`);
+    if (i.qosCos != null) L.push(` mls qos cos ${i.qosCos}`);
+    if (i.poe) L.push(` power inline ${i.poe}`);
     if (i.shutdown && !(dev.type === 'router' && !i.ip && !i.ipv6.length && i.shutdown)) L.push(' shutdown');
     else if (i.shutdown) L.push(' shutdown');
+    L.push('!');
+  }
+  if (dev.snmp && (dev.snmp.communities.length || dev.snmp.location || dev.snmp.contact || dev.snmp.hosts.length)) {
+    for (const cm of dev.snmp.communities) L.push(`snmp-server community ${cm.name} ${cm.access}`);
+    if (dev.snmp.location) L.push(`snmp-server location ${dev.snmp.location}`);
+    if (dev.snmp.contact) L.push(`snmp-server contact ${dev.snmp.contact}`);
+    for (const h of dev.snmp.hosts) L.push(`snmp-server host ${h.ip} version ${h.version} ${h.community}`);
+    if (dev.snmp.traps) L.push('snmp-server enable traps');
     L.push('!');
   }
   if (dev.ospf) {
