@@ -291,6 +291,10 @@ cmd(['conf'], 'ip dhcp snooping vlan WORD', 'DHCP snooping on VLANs', (c, a) => 
 });
 cmd(['conf'], 'ip nat inside source static IP IP', 'Static NAT: local then global', (c, a) => { c.dev.nat.statics.push({ local: a[0], global: a[1] }); });
 cmd(['conf'], 'no ip nat inside source static IP IP', 'Remove static NAT', (c, a) => { c.dev.nat.statics = c.dev.nat.statics.filter(s => !(s.local === a[0] && s.global === a[1])); });
+cmd(['conf'], 'no ip nat inside source list WORD interface REST', 'Remove dynamic NAT / PAT', (c, a) => {
+  const want = a[0];
+  if (c.dev.nat.dynamic && c.dev.nat.dynamic.acl === want) c.dev.nat.dynamic = null;
+});
 cmd(['conf'], 'ip nat inside source list WORD interface REST overload', 'PAT with interface overload', (c, a) => {
   const ifc = ND.getIface(c.dev, a[1].replace(/\s*overload$/i, ''));
   c.dev.nat.dynamic = { acl: a[0], iface: ifc ? ifc.name : a[1], overload: true };
@@ -343,6 +347,8 @@ cmd(['if'], 'no ip address', 'Remove IP address', c => eachIf(c, i => { i.ip = n
 cmd(['if'], 'shutdown', 'Shutdown the selected interface', c => eachIf(c, i => {
   if (!i.shutdown) c.out(`%LINK-5-CHANGED: Interface ${i.name}, changed state to administratively down`, 'sys');
   i.shutdown = true;
+  // shutting a port clears err-disable: this is why "shut / no shut" recovers one
+  i.errDisabled = false; i.errReason = null;
 }));
 cmd(['if'], 'no shutdown', 'Enable the selected interface', c => eachIf(c, i => {
   if (i.shutdown) {
@@ -420,6 +426,7 @@ cmd(['if'], 'switchport port-security', 'Enable port security', c => eachIf(c, i
   if (!i.portSec) i.portSec = { enabled: true, max: 1, violation: 'shutdown', sticky: false, macs: [], stickyLearned: [], violations: 0 };
   i.portSec.enabled = true;
 }));
+cmd(['if'], 'no switchport port-security', 'Disable port security', c => eachIf(c, i => { if (i.portSec) i.portSec.enabled = false; }));
 const psOf = i => i.portSec || (i.portSec = { enabled: false, max: 1, violation: 'shutdown', sticky: false, macs: [], stickyLearned: [], violations: 0 });
 cmd(['if'], 'switchport port-security maximum NUM', 'Max secure addresses', (c, a) => eachIf(c, i => { psOf(i).max = +a[0]; }));
 cmd(['if'], 'switchport port-security violation WORD', 'Security violation mode', (c, a) => {
@@ -471,6 +478,8 @@ cmd(['if'], 'ip helper-address IP', 'Forward UDP broadcasts (DHCP relay)', (c, a
 cmd(['if'], 'no ip helper-address IP', 'Remove helper address', (c, a) => eachIf(c, i => { i.helpers = i.helpers.filter(h => h !== a[0]); }));
 cmd(['if'], 'ip nat inside', 'Inside interface for NAT', c => eachIf(c, i => { i.natInside = true; i.natOutside = false; }));
 cmd(['if'], 'ip nat outside', 'Outside interface for NAT', c => eachIf(c, i => { i.natOutside = true; i.natInside = false; }));
+cmd(['if'], 'no ip nat inside', 'Remove inside NAT marking', c => eachIf(c, i => { i.natInside = false; }));
+cmd(['if'], 'no ip nat outside', 'Remove outside NAT marking', c => eachIf(c, i => { i.natOutside = false; }));
 cmd(['if'], 'no cdp enable', 'Disable CDP on this interface', c => eachIf(c, i => { i.cdpEnabled = false; }));
 cmd(['if'], 'cdp enable', 'Enable CDP on this interface', c => eachIf(c, i => { i.cdpEnabled = true; }));
 cmd(['if'], 'ip dhcp snooping trust', 'Trust DHCP on this interface', c => eachIf(c, i => { i.snoopTrust = true; }));

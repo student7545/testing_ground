@@ -474,9 +474,11 @@ function explainCmd(cmd) {
 function renderTopo(lab) {
   const box = el('div', 'topo');
   const maxY = Math.max(...Object.values(lab.layout).map(p => p[1])) + 22;
+  // widen the canvas for larger topologies so no device box is clipped (58px box, so +34 clears the half-width)
+  const maxX = Math.max(400, Math.max(...Object.values(lab.layout).map(p => p[0])) + 34);
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 400 ${maxY + 14}`);
+  svg.setAttribute('viewBox', `0 0 ${maxX} ${maxY + 14}`);
   const mk = (name, attrs, text) => {
     const n = document.createElementNS(NS, name);
     for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);

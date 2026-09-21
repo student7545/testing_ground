@@ -411,6 +411,12 @@ show('show interfaces switchport', 'Switchport information', c => {
     c.out(`Name: ${ND.shortIface(i.name)}\nSwitchport: Enabled\nAdministrative Mode: ${i.swMode === 'dynamic' ? 'dynamic ' + i.dtp : i.swMode}\nOperational Mode: ${ND.ifaceUp(c.topo, c.dev, i) ? (oper === 'trunk' ? 'trunk' : 'static access') : 'down'}\nNegotiation of Trunking: ${i.nonegotiate ? 'Off' : 'On'}\nAccess Mode VLAN: ${i.accessVlan} (${c.dev.vlans[i.accessVlan] ? c.dev.vlans[i.accessVlan].name : 'Inactive'})\nTrunking Native Mode VLAN: ${i.nativeVlan}\nVoice VLAN: ${i.voiceVlan || 'none'}\n`);
   }
 });
+show('show interfaces WORD switchport', 'Switchport information for one interface', (c, a) => {
+  const i = ND.getIface(c.dev, a[0]);
+  if (!i) { c.out('                                  ^\n% Invalid input detected at \'^\' marker.', 'err'); return; }
+  const oper = ND.operMode(c.topo, c.dev, i);
+  c.out(`Name: ${ND.shortIface(i.name)}\nSwitchport: Enabled\nAdministrative Mode: ${i.swMode === 'dynamic' ? 'dynamic ' + i.dtp : i.swMode}\nOperational Mode: ${ND.ifaceUp(c.topo, c.dev, i) ? (oper === 'trunk' ? 'trunk' : 'static access') : 'down'}\nNegotiation of Trunking: ${i.nonegotiate ? 'Off' : 'On'}\nAccess Mode VLAN: ${i.accessVlan} (${c.dev.vlans[i.accessVlan] ? c.dev.vlans[i.accessVlan].name : 'Inactive'})\nTrunking Native Mode VLAN: ${i.nativeVlan}\nTrunking VLANs Enabled: ${i.allowed ? i.allowed.join(',') : 'ALL'}\nVoice VLAN: ${i.voiceVlan || 'none'}\n`);
+});
 show('show interfaces REST', 'Interface status and configuration', (c, a) => {
   const i = ND.getIface(c.dev, a[0]);
   if (!i) return c.out(`% Invalid input detected at '^' marker.`, 'err');
