@@ -290,12 +290,15 @@ function renderLab(lab, keepState) {
 }
 
 function taskHtml(t) {
-  const txt = typeof t === 'string' ? t : t.t;
-  const why = typeof t === 'string' ? null : t.why;
-  if (!why) return `<li><div class="taskline"><span class="tasktext">${txt}</span></div></li>`;
-  return `<li><div class="taskline"><span class="tasktext">${txt}</span>`
-    + `<button class="whybtn" aria-expanded="false">why?</button></div>`
-    + `<div class="taskwhy" hidden>${why}</div></li>`;
+  if (typeof t === 'string') return `<li><div class="taskline"><span class="tasktext">${t}</span></div></li>`;
+  const dos = Array.isArray(t.do) ? t.do : null;
+  let h = `<li><div class="taskline"><span class="tasktext">${t.t}</span>`;
+  if (t.why) h += `<button class="whybtn" aria-expanded="false">why?</button>`;
+  h += `</div>`;
+  if (dos) h += `<ul class="taskdo">${dos.map(d => `<li>${d}</li>`).join('')}</ul>`;
+  if (t.done) h += `<div class="taskdone"><span class="donelabel">Done when</span>${t.done}</div>`;
+  if (t.why) h += `<div class="taskwhy" hidden>${t.why}</div>`;
+  return h + `</li>`;
 }
 
 function instructionsHtml(lab, drill) {

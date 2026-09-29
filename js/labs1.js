@@ -37,14 +37,74 @@ L({
   links: [], layout: { SW1: [190, 40] },
   intro: `<b>The situation:</b> a brand-new switch, straight out of the box. No name, no passwords, wide open.<br><b>Your goal:</b> learn to move between the command-line modes, then give the switch a name and basic security. This is the exact opening routine you'll repeat at the start of <em>every</em> lab in this course — run it until your fingers do it without thinking.`,
   tasks: [
-    { t: 'Move from user mode (the > prompt) into privileged mode (the # prompt), then into configuration mode', why: 'Almost every config session starts with these two commands. The prompt symbol always tells you which mode you are in — get used to reading it.' },
-    { t: 'Change the switch\'s name to SW1', why: 'You can\'t manage a room full of devices all named "Switch". The name shows in the prompt and identifies the device everywhere.' },
-    { t: 'Set the password for privileged mode to cisco123 (use the "secret" version)', why: 'This protects the # mode where changes are made. The "secret" version is stored as a hash; the older "password" version is stored readable — always use secret.' },
-    { t: 'Set the console line password to ccna, and turn on password checking for the console', why: 'The console is the physical plug-in port. Setting a password does nothing until you also tell the line to actually ask for it ("login").' },
-    { t: 'Turn on password encryption so passwords don\'t appear as plain text in the config', why: 'Without this, anyone glancing at "show run" can read the console password. The encryption is weak, but it stops shoulder-surfing.' },
-    { t: 'Stop the switch from trying to look up mistyped commands as hostnames', why: 'By default a typo makes the switch attempt a DNS lookup and your screen freezes for a minute. Every engineer turns this off on day one.' },
-    { t: 'Create a warning banner that appears when someone connects (any text you like)', why: 'A legal "authorized access only" notice. Auditors expect it, and the wording matters if an intruder is ever prosecuted.' },
-    { t: 'Save your configuration so it survives a reboot', why: 'Everything you typed lives in RAM. A power cycle erases it unless you copy it to permanent storage (startup-config).' },
+    { t: 'Walk up through the three command modes on SW1',
+      do: [
+        'Work on the <b>SW1</b> terminal tab (it is the only device in this lab).',
+        'You start in <b>user EXEC</b> mode — the prompt ends in <code>&gt;</code> and you can look but not change.',
+        'Move up into <b>privileged EXEC</b> mode, where the prompt ends in <code>#</code>.',
+        'From there move into <b>global configuration</b> mode, where the prompt reads <code>(config)#</code>.',
+      ],
+      done: 'Your prompt reads <code>Switch(config)#</code>.',
+      why: 'Almost every configuration session starts with these two commands. The prompt symbol always tells you which mode you are in — reading it before you type prevents most beginner mistakes.' },
+
+    { t: 'Rename the switch to SW1',
+      do: [
+        'In global configuration mode, set the device name to exactly <b>SW1</b> (capital S, capital W, digit one).',
+        'Watch the prompt as you press Enter — it changes immediately.',
+      ],
+      done: 'The prompt reads <code>SW1(config)#</code>.',
+      why: 'You cannot manage a room full of devices all called "Switch". The name appears in the prompt, in CDP output on neighbours, and in every log message the device sends.' },
+
+    { t: 'Protect privileged EXEC mode with the password cisco123',
+      do: [
+        'Set the privileged-mode password to exactly <b>cisco123</b>.',
+        'Use the <b>hashed</b> form of the command (the "secret" one), not the older plaintext "password" form.',
+      ],
+      done: '<code>show running-config</code> contains a line beginning <code>enable secret 5</code> — the 5 means it is stored as a hash.',
+      why: 'This is the password that guards the # mode where every change is made. The secret version is stored as an MD5 hash; the password version is stored readable, so always use secret.' },
+
+    { t: 'Put a password on the console port and make the switch actually ask for it',
+      do: [
+        'Enter the configuration mode for <b>console line 0</b> — the physical port you plug a laptop into.',
+        'Set its password to exactly <b>ccna</b>.',
+        'Then add the one extra command that tells the line to prompt for that password. A password on its own is ignored until you do.',
+        'Leave the line configuration mode when you are finished.',
+      ],
+      done: '<code>show running-config</code> shows both a <code>password</code> line and a <code>login</code> line underneath <code>line con 0</code>.',
+      why: 'The console is the physical way in. Setting a password does nothing until "login" switches on password checking — forgetting that second line is one of the most common slips in the exam and in real life.' },
+
+    { t: 'Hide the plaintext passwords in the configuration file',
+      do: [
+        'Back in global configuration mode, turn on the service that encrypts every plaintext password in the config.',
+        'Then look at <code>show running-config</code> again and find the console password — it is no longer readable.',
+      ],
+      done: 'The console password shows as <code>password 7 &lt;hash&gt;</code> instead of <code>password ccna</code>.',
+      why: 'Without it, anyone glancing at the screen while you run "show run" can read the console password. Type-7 encryption is weak and reversible, but it stops shoulder-surfing.' },
+
+    { t: 'Stop the switch from doing DNS lookups on your typos',
+      do: [
+        'In global configuration mode, disable domain lookup (it is the "no" form of the domain-lookup command).',
+      ],
+      done: '<code>show running-config</code> contains <code>no ip domain-lookup</code>.',
+      why: 'By default, a mistyped command is treated as a hostname to telnet to, so the device freezes for up to a minute trying to resolve it. Every engineer turns this off on day one.' },
+
+    { t: 'Add a login banner warning that access is restricted',
+      do: [
+        'Configure a <b>message-of-the-day</b> banner.',
+        'The text is up to you — something like <i>Authorized access only!</i> is fine.',
+        'Note the syntax quirk: the first character you type after the command is the <b>delimiter</b>, and the banner ends when you type that same character again. <code>#</code> is the usual choice.',
+      ],
+      done: '<code>show running-config</code> contains a <code>banner motd</code> line with your text.',
+      why: 'A legal "authorised access only" notice. Auditors expect it, and its wording has genuinely mattered when intruders were prosecuted.' },
+
+    { t: 'Save everything so it survives a reboot',
+      do: [
+        'Leave configuration mode and return to privileged EXEC (the <code>#</code> prompt).',
+        'Copy the running configuration (in RAM) into the startup configuration (in NVRAM).',
+        'Confirm it worked by displaying the startup configuration.',
+      ],
+      done: 'IOS reports <code>[OK]</code>, and <code>show startup-config</code> now shows your hostname and passwords.',
+      why: 'Everything you typed lives in RAM only. A power cycle erases all of it unless you copy it to NVRAM first — the single most expensive lesson a new engineer learns.' },
   ],
   steps: [
     { t: 'Enter privileged EXEC mode, then global configuration mode.', c: ['enable', 'configure terminal'], note: 'The prompt changes from <code>Switch&gt;</code> to <code>Switch#</code> to <code>Switch(config)#</code>. Watch it every time — the prompt tells you which commands are legal.' },
@@ -86,12 +146,57 @@ L({
   layout: { PC1: [60, 20], PC2: [60, 90], SW1: [220, 55] },
   intro: `<b>The situation:</b> two PCs are plugged into a switch, already addressed and able to reach each other.<br><b>Your goal:</b> make them talk, then look inside the switch to see what it learned. A switch has one core job — remember which device is on which port — and this lab shows that memory being built, erased, and rebuilt.`,
   tasks: [
-    { t: 'Open the PC1 tab and check its IP settings with ipconfig', why: 'Always know your starting point: PC1 is 192.168.1.11, PC2 is 192.168.1.12, same subnet, same switch.' },
-    { t: 'From PC1, ping PC2 at 192.168.1.12 — it should succeed', why: 'A ping creates traffic (ARP + ICMP frames) — the raw material the switch needs before it can learn anything. No traffic, no MAC table.' },
-    { t: 'Switch to the PC2 tab and ping PC1 back at 192.168.1.11', why: 'The switch learns a MAC address only from frames that device SENDS. PC2 must talk for its address to be recorded.' },
-    { t: 'On SW1, display the MAC address table', why: 'This table is the switch\'s entire forwarding brain: which MAC lives on which port, in which VLAN.' },
-    { t: 'Match each MAC in the table to the right PC (compare with ipconfig /all on each PC)', why: 'Reading the table and predicting what the switch does with a frame — flood it, forward it, or drop it — is a core exam skill.' },
-    { t: 'Clear the learned MAC entries, then ping again and watch the table refill', why: 'Proves the entries are dynamic: cleared (or aged out after 5 minutes of silence), they come right back the moment traffic flows.' },
+    { t: 'Check the addressing on PC1 before you send anything',
+      do: [
+        'Switch to the <b>PC1</b> terminal tab using the device tabs above the terminal.',
+        'Display its IP configuration with the Windows-style command <code>ipconfig</code>.',
+        'Note the address: PC1 is <b>192.168.1.11</b> and PC2 is <b>192.168.1.12</b> — same subnet, same switch, no router involved.',
+      ],
+      done: 'You can see PC1\'s address and mask on screen.',
+      why: 'Always establish your starting point. Two hosts in the same subnet should reach each other with no routing at all — if they cannot, the fault is at layer 1 or 2.' },
+
+    { t: 'Ping from PC1 to PC2 so the switch has traffic to learn from',
+      do: [
+        'Still on the <b>PC1</b> tab, ping <b>192.168.1.12</b>.',
+        'You should get replies.',
+      ],
+      done: 'The ping reports replies rather than "Request timed out".',
+      why: 'A ping creates the ARP and ICMP frames a switch needs. No traffic means an empty MAC table — the switch only learns from frames that actually arrive.' },
+
+    { t: 'Ping back from PC2 so the switch learns that address too',
+      do: [
+        'Switch to the <b>PC2</b> tab.',
+        'Ping <b>192.168.1.11</b> from there.',
+      ],
+      done: 'PC2 also gets replies.',
+      why: 'A switch learns a MAC address only from frames a device SENDS. PC2 has to speak before its address appears anywhere in the table.' },
+
+    { t: 'Display the MAC address table on SW1',
+      do: [
+        'Switch to the <b>SW1</b> tab and enter privileged EXEC mode (the <code>#</code> prompt).',
+        'Display the MAC address table.',
+        'Read the four columns: VLAN, MAC address, type (dynamic or static), and the port it was learned on.',
+      ],
+      done: 'You can see entries against <b>Fa0/1</b> and <b>Fa0/2</b>.',
+      why: 'This table is the switch\'s entire forwarding brain: which MAC address lives behind which port, in which VLAN. Everything a switch does comes from it.' },
+
+    { t: 'Match each MAC address in the table to the right PC',
+      do: [
+        'On each PC tab, run <code>ipconfig /all</code> to see that host\'s own MAC address.',
+        'Compare those two addresses with the entries in SW1\'s table and work out which entry is which host.',
+      ],
+      done: 'You can say out loud which port PC1 is on and which port PC2 is on, from the table alone.',
+      why: 'Reading the table and predicting what the switch does with a frame — flood it, forward it out one port, or filter it — is a guaranteed exam skill.' },
+
+    { t: 'Clear the table, then rebuild it with fresh traffic',
+      do: [
+        'On <b>SW1</b>, clear the dynamically learned MAC entries. The command needs the keyword <b>dynamic</b> on the end — without it IOS answers <i>% Incomplete command</i>.',
+        'Display the table again and confirm it is now empty.',
+        'Go back to the <b>PC1</b> tab and ping <b>192.168.1.12</b> once more.',
+        'Return to <b>SW1</b> and display the table a third time.',
+      ],
+      done: 'The table is empty straight after the clear, and the entries are back after the ping.',
+      why: 'It proves the entries are dynamic. Cleared by hand, or aged out after five minutes of silence, they reappear the instant traffic flows again — you never configure them.' },
   ],
   steps: [
     { t: 'Open the PC1 tab and check its addressing.', c: ['ipconfig'] },
@@ -126,13 +231,62 @@ L({
   layout: { PC1: [50, 20], R1: [190, 55], PC2: [330, 20] },
   intro: `<b>The situation:</b> two PCs sit on two different networks (10.0.1.x and 10.0.2.x), with a router between them. The router's ports are switched off and have no addresses, so nothing works yet.<br><b>Your goal:</b> give each router port an address and turn it on, so the PCs can reach each other through it. The pattern you'll repeat here — pick an interface, give it an address, turn it on — is the most-typed sequence in all of CCNA.`,
   tasks: [
-    { t: 'Rename the router to R1', why: 'Identify the box before touching it — the habit that stops you configuring the wrong device one day.' },
-    { t: 'Enter interface G0/0 and give it the IP address 10.0.1.1 with mask 255.255.255.0', why: 'This address becomes the default gateway for PC1\'s network (10.0.1.0/24) — it\'s where PC1 sends anything off-subnet.' },
-    { t: 'Give G0/0 the description "LAN1"', why: 'Descriptions cost nothing and document what the port is for — for the next person, usually future you.' },
-    { t: 'Turn G0/0 on with "no shutdown"', why: 'Router ports ship switched OFF (administratively down). Forgetting this is the single most common beginner mistake.' },
-    { t: 'Do the same for G0/1: address 10.0.2.1 mask 255.255.255.0, description "LAN2", turned on', why: 'The second LAN gets its own gateway on its own interface — one interface per network is the router\'s whole job.' },
-    { t: 'Check your work with "show ip interface brief" — both ports should say up / up', why: 'Two columns matter: Status (layer 1) and Protocol (layer 2). "administratively down" means you forgot no shutdown.' },
-    { t: 'From the PC1 tab, ping PC2 at 10.0.2.10', why: 'The proof: the router forwards between its two directly-connected networks. No routes needed — connected networks are known automatically.' },
+    { t: 'Name the router R1',
+      do: [
+        'Work on the <b>R1</b> tab. Enter privileged EXEC, then global configuration mode.',
+        'Set the hostname to exactly <b>R1</b>.',
+      ],
+      done: 'The prompt reads <code>R1(config)#</code>.',
+      why: 'Identify the box before you touch it. It is the habit that stops you one day configuring the wrong device entirely.' },
+
+    { t: 'Address G0/0 — the interface facing PC1',
+      do: [
+        'Enter interface configuration mode for <b>GigabitEthernet0/0</b>.',
+        'Give it the address <b>10.0.1.1</b> with mask <b>255.255.255.0</b>.',
+      ],
+      done: 'No error is returned; you are at the <code>R1(config-if)#</code> prompt.',
+      why: 'This address becomes the default gateway for PC1\'s network, 10.0.1.0/24 — the door PC1 uses for anything outside its own subnet.' },
+
+    { t: 'Describe G0/0 as LAN1',
+      do: [
+        'While still inside interface G0/0, set its description to <b>LAN1</b>.',
+      ],
+      done: 'The description appears in <code>show running-config</code> under that interface.',
+      why: 'Descriptions cost nothing and document what a port is for — for the next person, who is usually you in six months.' },
+
+    { t: 'Switch G0/0 on',
+      do: [
+        'Still inside interface G0/0, enable the interface. Router interfaces ship <b>administratively down</b>, so this is the command that actually turns it on.',
+        'Watch for the <code>%LINK-5-CHANGED</code> and <code>%LINEPROTO-5-UPDOWN</code> log messages confirming it came up.',
+      ],
+      done: 'The log reports the interface changed state to up.',
+      why: 'Router ports are disabled out of the box; switch ports are not. Forgetting this single command is the most common beginner mistake there is.' },
+
+    { t: 'Repeat the whole pattern on G0/1 — the interface facing PC2',
+      do: [
+        'Enter interface <b>GigabitEthernet0/1</b>.',
+        'Give it the address <b>10.0.2.1</b> with mask <b>255.255.255.0</b>.',
+        'Set its description to <b>LAN2</b>.',
+        'Enable the interface.',
+      ],
+      done: 'The second interface also reports that it came up.',
+      why: 'One interface per network is a router\'s whole job. The four-command pattern — interface, address, description, enable — is the most-typed sequence in the entire CCNA.' },
+
+    { t: 'Verify both interfaces are up and correctly addressed',
+      do: [
+        'Return to privileged EXEC (or use <code>do</code> from config mode) and show the brief interface summary.',
+        'Check that <b>both</b> G0/0 and G0/1 read <b>up</b> in the Status column and <b>up</b> in the Protocol column, with the addresses you configured.',
+      ],
+      done: 'Two interfaces read up/up with 10.0.1.1 and 10.0.2.1.',
+      why: 'Status is layer 1 and Protocol is layer 2. "administratively down" means you forgot to enable it; "down/down" means it is enabled but sees no neighbour.' },
+
+    { t: 'Prove it works: ping across the router from PC1 to PC2',
+      do: [
+        'Switch to the <b>PC1</b> terminal tab.',
+        'Ping <b>10.0.2.10</b>, which is PC2 on the other network.',
+      ],
+      done: 'PC1 gets replies from 10.0.2.10.',
+      why: 'This is the proof that a router forwards between its directly-connected networks. No static routes are needed yet — a router automatically knows the networks it is plugged into.' },
   ],
   steps: [
     { t: 'Set the hostname.', c: ['enable', 'configure terminal', 'hostname R1'] },
@@ -167,12 +321,52 @@ L({
   layout: { PC1: [60, 20], PC2: [60, 90], SW1: [220, 55] },
   intro: `<b>The situation:</b> a switch with 7 ports, but only two of them (F0/1 and F0/2) actually have PCs plugged in. The other five sit unused and live — anyone could plug into them.<br><b>Your goal:</b> tidy and secure the physical ports: fix the speed and duplex on the two host ports, label them, and switch off everything unused. You'll also meet the <i>interface range</i> command, which configures many ports in one go.`,
   tasks: [
-    { t: 'Select ports F0/1 and F0/2 together using "interface range"', why: 'The range command applies everything you type to all selected ports at once — a massive time saver on real switches with 48 ports.' },
-    { t: 'On both ports: set the speed to 100', why: 'Hard-coding removes autonegotiation surprises. Set both ends of a cable the same, or leave both on auto.' },
-    { t: 'On both ports: set the duplex to full', why: 'The classic failure: one side hard-coded, the other on auto → the auto side falls back to half duplex → collisions and terrible performance.' },
-    { t: 'On both ports: add the description "HOST-PORT"', why: 'Labels which ports are for user devices — so nobody "cleans up" a live port by accident.' },
-    { t: 'Select the unused ports F0/3 through F0/6 plus G0/1 in one range, and shut them all down', why: 'A live unused jack is an open invitation — anyone can plug in. Disabling unused ports is baseline switch security.' },
-    { t: 'Check the result with "show interfaces status"', why: 'THE port overview: connected / notconnect / disabled per port, plus VLAN, speed and duplex. Manually-set values show plain (full/100); autonegotiated ones get an "a-" prefix (a-full).' },
+    { t: 'Select the two host ports together with a range command',
+      do: [
+        'On <b>SW1</b>, enter privileged EXEC then global configuration mode.',
+        'Select <b>F0/1 and F0/2 together</b> in a single command using the interface <b>range</b> form.',
+        'Mind the spacing: the range syntax wants spaces around the hyphen, as in <code>f0/1 - 2</code>.',
+      ],
+      done: 'The prompt reads <code>SW1(config-if-range)#</code>.',
+      why: 'Everything you type from now on applies to every port in the range at once — the command that makes a 48-port switch survivable.' },
+
+    { t: 'Hard-code the speed to 100 Mbps on both host ports',
+      do: [
+        'With both ports still selected, set the speed to <b>100</b>.',
+      ],
+      done: 'In <code>show interfaces status</code> those ports later show <code>100</code> with no prefix.',
+      why: 'Hard-coding removes auto-negotiation surprises. The rule is to set both ends of a cable the same way, or leave both on auto — never one of each.' },
+
+    { t: 'Hard-code the duplex to full on both host ports',
+      do: [
+        'With the same range still selected, set the duplex to <b>full</b>.',
+      ],
+      done: 'Those ports later show <code>full</code> with no prefix in the status output.',
+      why: 'The classic failure: one side hard-coded and the other on auto. The auto side cannot detect duplex, falls back to half, and you get a link that is up, slow, and full of late collisions.' },
+
+    { t: 'Label both host ports HOST-PORT',
+      do: [
+        'Still in the range, set the description to <b>HOST-PORT</b> on both interfaces.',
+      ],
+      done: 'The Name column of <code>show interfaces status</code> reads HOST-PORT for Fa0/1 and Fa0/2.',
+      why: 'It marks which ports feed user devices, so nobody "tidies up" a live port by accident.' },
+
+    { t: 'Shut down every unused port in one command',
+      do: [
+        'Select <b>F0/3, F0/4, F0/5, F0/6 and G0/1</b> in a single range command. A range accepts a hyphen for a run of ports and commas for extras, so <code>f0/3 - 6, g0/1</code> takes all five at once.',
+        'Disable them all.',
+      ],
+      done: 'Those five ports read <b>disabled</b> in the status output.',
+      why: 'A live unused jack in a meeting room is an open invitation. Disabling what is not in use is the baseline of switch hardening, before port security is even considered.' },
+
+    { t: 'Check the whole switch in one screen',
+      do: [
+        'Display the interface status summary.',
+        'Read each column: status (connected / notconnect / disabled), VLAN, duplex and speed.',
+        'Note which values carry an <code>a-</code> prefix and which do not.',
+      ],
+      done: 'Two ports read connected at 100/full, five read disabled.',
+      why: 'This is THE switch overview command. The "a-" prefix means auto-negotiated, plain values mean a human configured them — spotting the difference is how you find a duplex mismatch.' },
   ],
   steps: [
     { t: 'Configure both host ports at once with a range.', c: ['enable', 'configure terminal', 'interface range f0/1 - 2', 'speed 100', 'duplex full', 'description HOST-PORT'], note: 'Everything you type now applies to every interface in the range — massive time saver.' },
@@ -205,16 +399,89 @@ L({
   layout: { PC1: [40, 30], R1: [150, 30], R2: [250, 30], PC2: [355, 30] },
   intro: `<b>The situation:</b> two routers connected to each other, each with its own PC network behind it. Nothing is configured yet.<br><b>Your goal:</b> address everything, then teach each router how to reach the network on the far side. A router only knows the networks it is directly plugged into — anything else you must tell it about. R1 will get a route to one specific network; R2 will get a "send everything else this way" default route.`,
   tasks: [
-    { t: 'On R1: set the hostname to R1', why: 'Always name the device first so you know which console you\'re typing into.' },
-    { t: 'On R1: give G0/0 (the LAN side) the address 10.0.1.1 mask 255.255.255.0, and turn it on', why: 'This is PC1\'s default gateway — the door out of the 10.0.1.0 network.' },
-    { t: 'On R1: give G0/1 (the link to R2) the address 192.168.12.1 mask 255.255.255.252, and turn it on', why: 'The .252 mask (/30) leaves exactly two usable addresses — perfectly sized for a two-router link.' },
-    { t: 'Switch to R2: set the hostname to R2', why: 'Same habit, second box.' },
-    { t: 'On R2: give G0/0 the address 10.0.2.1 mask 255.255.255.0, and turn it on', why: 'PC2\'s default gateway on the far LAN.' },
-    { t: 'On R2: give G0/1 the address 192.168.12.2 mask 255.255.255.252, and turn it on', why: 'The other end of the link. Both ends must be inside the same tiny /30 network or the routers can\'t reach each other at all.' },
-    { t: 'Test: from R1, ping R2\'s link address 192.168.12.2', why: 'Confirm the middle link works before adding routes — troubleshoot in layers, nearest thing first.' },
-    { t: 'On R1: add a static route telling it that network 10.0.2.0 255.255.255.0 is reached via 192.168.12.2', why: 'Routers only know networks they touch directly. R1 has no idea PC2\'s network exists until you tell it where to send that traffic.' },
-    { t: 'On R2: add a default route (0.0.0.0 0.0.0.0) via 192.168.12.1', why: 'A default route matches EVERYTHING not otherwise known — the "route of last resort". This is exactly how your home router points at your ISP.' },
-    { t: 'From the PC1 tab, ping PC2 at 10.0.2.10 — then ping back from PC2', why: 'A ping needs a route there AND a route back. Configure only one router and packets arrive but replies die — the #1 static routing gotcha.' },
+    { t: 'Name the first router R1',
+      do: [
+        'Work on the <b>R1</b> tab. Enter privileged EXEC, then global configuration mode.',
+        'Set the hostname to <b>R1</b>.',
+      ],
+      done: 'The prompt reads <code>R1(config)#</code>.',
+      why: 'Name the device before you configure it, so you always know which console you are typing into.' },
+
+    { t: 'On R1, address the LAN interface G0/0 and enable it',
+      do: [
+        'Enter interface <b>G0/0</b> — the side facing PC1.',
+        'Give it <b>10.0.1.1</b> with mask <b>255.255.255.0</b>.',
+        'Enable the interface.',
+      ],
+      done: 'The interface reports it came up.',
+      why: 'This is PC1\'s default gateway — the door out of the 10.0.1.0/24 network.' },
+
+    { t: 'On R1, address the link to R2 on G0/1 and enable it',
+      do: [
+        'Enter interface <b>G0/1</b> — the cable running to R2.',
+        'Give it <b>192.168.12.1</b> with mask <b>255.255.255.252</b>.',
+        'Enable the interface.',
+      ],
+      done: 'G0/1 is up with a /30 address.',
+      why: 'A .252 mask is a /30 and leaves exactly two usable addresses — perfectly sized for a link with exactly two routers on it and nothing wasted.' },
+
+    { t: 'Move to R2 and name it',
+      do: [
+        'Switch to the <b>R2</b> tab using the device tabs above the terminal.',
+        'Enter privileged EXEC and global configuration mode, then set the hostname to <b>R2</b>.',
+      ],
+      done: 'The prompt reads <code>R2(config)#</code>.',
+      why: 'Same habit, second box. Getting into the routine now pays off when you are working on eight devices at once.' },
+
+    { t: 'On R2, address the LAN interface G0/0 and enable it',
+      do: [
+        'Enter interface <b>G0/0</b> — the side facing PC2.',
+        'Give it <b>10.0.2.1</b> with mask <b>255.255.255.0</b>.',
+        'Enable the interface.',
+      ],
+      done: 'G0/0 comes up with the LAN address.',
+      why: 'PC2\'s default gateway on the far network — the mirror image of what you built on R1.' },
+
+    { t: 'On R2, address the other end of the router link on G0/1',
+      do: [
+        'Enter interface <b>G0/1</b>.',
+        'Give it <b>192.168.12.2</b> with mask <b>255.255.255.252</b> — the second usable address of that /30.',
+        'Enable the interface.',
+      ],
+      done: 'Both ends of the link are now addressed inside the same /30.',
+      why: 'Both ends of a link MUST be in the same subnet. 192.168.12.1 and .2 are in the same /30; .1 and .5 would not be, and the routers could never speak.' },
+
+    { t: 'Test the link between the routers before adding any routes',
+      do: [
+        'From <b>R1</b>, ping <b>192.168.12.2</b>.',
+      ],
+      done: 'R1 gets replies from R2 across the /30.',
+      why: 'Troubleshoot in layers, nearest thing first. There is no point adding routes across a link whose two ends cannot even reach each other.' },
+
+    { t: 'On R1, add a static route to the far LAN',
+      do: [
+        'In global configuration mode on <b>R1</b>, create a static route for destination network <b>10.0.2.0</b> with mask <b>255.255.255.0</b>, reachable through next hop <b>192.168.12.2</b>.',
+        'Read it aloud as you type: "to reach 10.0.2.0/24, send it to 192.168.12.2".',
+        'Then display the routing table and find your new entry, marked with an <b>S</b>.',
+      ],
+      done: '<code>show ip route</code> shows an <code>S 10.0.2.0/24 [1/0] via 192.168.12.2</code> entry.',
+      why: 'A router only knows the networks it is directly plugged into. Everything else has to be told to it, either by a static route like this one or by a routing protocol later.' },
+
+    { t: 'On R2, add a default route pointing back at R1',
+      do: [
+        'In global configuration mode on <b>R2</b>, create a route for destination <b>0.0.0.0</b> with mask <b>0.0.0.0</b>, via next hop <b>192.168.12.1</b>.',
+        'Display the routing table and find the entry marked <code>S*</code>.',
+      ],
+      done: '<code>show ip route</code> shows <code>S* 0.0.0.0/0 [1/0] via 192.168.12.1</code>.',
+      why: 'All-zeros means "match anything I have no better route for" — the route of last resort. It is exactly how your router at home points at your ISP.' },
+
+    { t: 'Test end to end, in both directions',
+      do: [
+        'Switch to the <b>PC1</b> tab and ping <b>10.0.2.10</b>.',
+        'Then switch to the <b>PC2</b> tab and ping <b>10.0.1.10</b>.',
+      ],
+      done: 'Both pings get replies.',
+      why: 'A ping needs a route there AND a route back. Configure only one router and the packets arrive while the replies die — the number one static-routing mistake, and the reason you always test both ways.' },
   ],
   steps: [
     { t: 'Configure R1 completely.', c: ['enable', 'configure terminal', 'hostname R1', 'interface g0/0', 'ip address 10.0.1.1 255.255.255.0', 'no shutdown', 'interface g0/1', 'ip address 192.168.12.1 255.255.255.252', 'no shutdown'] },
@@ -250,14 +517,70 @@ L({
   layout: { PC1: [50, 15], PC2: [50, 95], PC3: [340, 15], SW1: [200, 55] },
   intro: `<b>The situation:</b> three PCs plugged into one switch, all on the same network — right now every PC can reach every other PC.<br><b>Your goal:</b> split them into two separate groups using VLANs: PC1 and PC2 go into the engineering group, PC3 into the sales group. Afterwards PC1 and PC2 still talk to each other, but neither can reach PC3 — and you will not have changed a single IP address to do it.`,
   tasks: [
-    { t: 'Before changing anything: from PC1, ping PC3 at 10.0.0.13 — notice it works', why: 'The "before" picture: right now all three PCs share one big network and can all talk. You\'re about to break that on purpose.' },
-    { t: 'Create VLAN 10 and name it ENGINEERING', why: 'A VLAN must exist in the switch\'s VLAN database before ports can join it. Names keep "show vlan brief" readable when you have twenty of them.' },
-    { t: 'Create VLAN 20 and name it SALES', why: 'The second, separate group. Each VLAN is its own broadcast domain — its own logical switch.' },
-    { t: 'Make ports F0/1 and F0/2 access ports, assigned to VLAN 10', why: 'An access port carries exactly one VLAN. Assigning it places the attached PC into that VLAN\'s world.' },
-    { t: 'Make port F0/3 an access port in VLAN 20', why: 'PC3 is now logically on a different "switch", even though the hardware never changed.' },
-    { t: 'Check your work with "show vlan brief"', why: 'The verification view: every VLAN, its name, and which ports belong to it.' },
-    { t: 'From PC1, ping PC2 (10.0.0.12) — this should still work', why: 'PC1 and PC2 are both in VLAN 10, so traffic between them flows normally.' },
-    { t: 'From PC1, ping PC3 (10.0.0.13) — this should now FAIL', why: 'The whole point: same IP subnet, same physical switch, yet the VLAN wall separates them. Crossing VLANs now requires a router — that\'s the Day 18 lab.' },
+    { t: 'Record the "before" picture: prove all three PCs can currently reach each other',
+      do: [
+        'Switch to the <b>PC1</b> terminal tab.',
+        'Ping <b>10.0.0.13</b> (PC3). It should succeed right now.',
+      ],
+      done: 'PC1 gets replies from PC3.',
+      why: 'All three PCs share one subnet and one switch, so everything works. You are about to break that deliberately — and you can only prove you broke it if you know it worked first.' },
+
+    { t: 'Create VLAN 10 and name it ENGINEERING',
+      do: [
+        'On <b>SW1</b>, enter privileged EXEC then global configuration mode.',
+        'Create VLAN <b>10</b>. This moves you into VLAN configuration mode.',
+        'Give it the name <b>ENGINEERING</b> (capitals, exactly as written — the check looks for it).',
+      ],
+      done: '<code>show vlan brief</code> lists VLAN 10 with the name ENGINEERING.',
+      why: 'A VLAN has to exist in the switch\'s database before a port can meaningfully join it. Names keep the output readable once you have twenty of them.' },
+
+    { t: 'Create VLAN 20 and name it SALES',
+      do: [
+        'Still in configuration mode, create VLAN <b>20</b> and name it <b>SALES</b>.',
+        'You can go straight from one vlan command to the next without exiting in between.',
+      ],
+      done: '<code>show vlan brief</code> lists both VLAN 10 and VLAN 20.',
+      why: 'The second group. Each VLAN is its own broadcast domain — effectively its own separate switch, built in software.' },
+
+    { t: 'Put PC1 and PC2\'s ports into VLAN 10',
+      do: [
+        'Select <b>F0/1 and F0/2</b> — you can do both at once with an interface range.',
+        'Set the port mode to <b>access</b> (a port carrying exactly one VLAN).',
+        'Assign them to VLAN <b>10</b>.',
+      ],
+      done: '<code>show vlan brief</code> shows Fa0/1 and Fa0/2 in the Ports column of VLAN 10.',
+      why: 'Access mode says "this port carries one VLAN, untagged"; the access-vlan command says which one. Both commands together place the attached PC into that VLAN.' },
+
+    { t: 'Put PC3\'s port into VLAN 20',
+      do: [
+        'Select interface <b>F0/3</b>.',
+        'Set it to access mode and assign it to VLAN <b>20</b>.',
+      ],
+      done: 'Fa0/3 appears under VLAN 20 in <code>show vlan brief</code>.',
+      why: 'PC3 is now on a logically different switch, even though not one cable moved and not one IP address changed.' },
+
+    { t: 'Verify the VLAN database and port membership in one view',
+      do: [
+        'Display the brief VLAN table.',
+        'Check three things: VLAN 10 exists with the right name, VLAN 20 exists with the right name, and each port sits in the VLAN you intended.',
+      ],
+      done: 'Fa0/1 and Fa0/2 are listed under VLAN 10, Fa0/3 under VLAN 20.',
+      why: 'This is the one screen that answers "which port is in which VLAN". It is the first command to run when a host mysteriously cannot reach its gateway.' },
+
+    { t: 'Confirm traffic still flows inside VLAN 10',
+      do: [
+        'Switch to the <b>PC1</b> tab and ping <b>10.0.0.12</b> (PC2).',
+      ],
+      done: 'The ping succeeds.',
+      why: 'PC1 and PC2 are both in VLAN 10, so nothing between them has changed. Half the lesson is what still works.' },
+
+    { t: 'Confirm traffic is now blocked between VLANs — this ping must FAIL',
+      do: [
+        'Still on <b>PC1</b>, ping <b>10.0.0.13</b> (PC3).',
+        'Expect "Request timed out". That failure is the goal of the lab, not a mistake.',
+      ],
+      done: 'The ping to PC3 fails while the ping to PC2 still works.',
+      why: 'Same IP subnet, same physical switch, and yet they cannot talk — because a VLAN is a separate broadcast domain. Crossing between them needs a router, which is the Day 18 lab.' },
   ],
   steps: [
     { t: 'First, prove everything can ping everything (the "before" picture). From PC1:', c: ['ping 10.0.0.13'] },
@@ -297,15 +620,77 @@ L({
   layout: { PC1: [35, 15], PC2: [35, 95], SW1: [140, 55], SW2: [260, 55], PC3: [360, 15], PC4: [360, 95] },
   intro: `<b>The situation:</b> two switches, joined by a single cable. Each switch hosts PCs from <em>both</em> groups — VLAN 10 and VLAN 20 exist on both sides.<br><b>Your goal:</b> set up both switches, then turn the cable between them into a <b>trunk</b> — a link that carries several VLANs at once by labelling each frame with its VLAN number. You'll also tighten two trunk settings that matter for security: the native VLAN and the list of VLANs allowed across.`,
   tasks: [
-    { t: 'On SW1: create VLANs 10 and 20', why: 'VLANs are configured per switch — each switch keeps its own VLAN list.' },
-    { t: 'On SW1: make F0/1 an access port in VLAN 10, and F0/2 an access port in VLAN 20', why: 'Places PC1 into VLAN 10 and PC2 into VLAN 20 on the left side.' },
-    { t: 'On SW1: make G0/1 (the cable to SW2) a permanent trunk', why: 'One cable must carry BOTH VLANs between the switches. A trunk does this by adding a small VLAN tag to every frame crossing it.' },
-    { t: 'On SW1\'s trunk: change the native VLAN to 1001', why: 'Native VLAN traffic travels untagged. Best practice moves it off VLAN 1 to an unused VLAN — and it must match on both ends or traffic leaks between VLANs.' },
-    { t: 'On SW1\'s trunk: allow only VLANs 10 and 20 across', why: 'Pruning: don\'t carry VLANs the far side doesn\'t need. Careful — "allowed vlan 10,20" REPLACES the list; "allowed vlan add 30" appends. Mixing those up causes famous outages.' },
-    { t: 'On SW2: repeat all of it — VLANs 10 & 20, F0/1→10, F0/2→20, trunk on G0/1 with native 1001 and allowed 10,20', why: 'A tagged frame arriving for a VLAN the receiving switch hasn\'t created is simply dropped — both sides need the identical setup.' },
-    { t: 'Verify with "show interfaces trunk" on either switch', why: 'Read all four facts: trunking on, encapsulation 802.1q, native VLAN 1001, allowed list 10,20.' },
-    { t: 'Test same-VLAN across switches: PC1→PC3 (10.0.10.12) and PC2→PC4 (10.0.20.12) should both work', why: 'Proves tagged frames survive the trip: tagged at SW1, carried over the trunk, untagged at SW2\'s access port.' },
-    { t: 'Test cross-VLAN: PC1→PC4 should FAIL', why: 'The trunk carries both VLANs but never mixes them — crossing VLANs still requires a router.' },
+    { t: 'On SW1, create VLANs 10 and 20',
+      do: [
+        'Work on the <b>SW1</b> tab. Enter privileged EXEC then global configuration mode.',
+        'Create VLAN <b>10</b> and VLAN <b>20</b>. Names are optional in this lab.',
+      ],
+      done: '<code>show vlan brief</code> on SW1 lists both VLANs.',
+      why: 'VLANs are configured per switch — each one keeps its own database, and a switch drops frames for a VLAN it has never heard of.' },
+
+    { t: 'On SW1, put the two PC ports into their VLANs',
+      do: [
+        'Set <b>F0/1</b> to access mode in VLAN <b>10</b> (this is PC1).',
+        'Set <b>F0/2</b> to access mode in VLAN <b>20</b> (this is PC2).',
+      ],
+      done: 'Fa0/1 shows under VLAN 10 and Fa0/2 under VLAN 20.',
+      why: 'The left-hand switch now has one host in each VLAN — which is what makes the trunk test meaningful later.' },
+
+    { t: 'On SW1, turn the link to SW2 into a permanent trunk',
+      do: [
+        'Select interface <b>G0/1</b> — the cable running across to SW2.',
+        'Set it to <b>trunk</b> mode permanently, rather than letting it negotiate.',
+      ],
+      done: '<code>show interfaces trunk</code> lists Gi0/1.',
+      why: 'One cable has to carry BOTH VLANs between the switches. A trunk does that by adding a small 802.1Q tag with the VLAN number to every frame that crosses it.' },
+
+    { t: 'On SW1\'s trunk, move the native VLAN to 1001',
+      do: [
+        'Still inside <b>G0/1</b>, set the trunk\'s native VLAN to <b>1001</b>.',
+      ],
+      done: 'The Native VLAN column of <code>show interfaces trunk</code> reads 1001.',
+      why: 'Native-VLAN frames cross the trunk untagged. Moving it off VLAN 1 to an unused VLAN removes an attack path — and the value must match on both ends, or traffic leaks between VLANs.' },
+
+    { t: 'On SW1\'s trunk, allow only VLANs 10 and 20 across it',
+      do: [
+        'Still inside <b>G0/1</b>, set the allowed VLAN list to exactly <b>10,20</b> (no spaces in the list).',
+      ],
+      done: 'The "VLANs allowed on trunk" line reads 10,20.',
+      why: 'Pruning keeps VLANs off links that do not need them. Careful with the syntax: the bare form REPLACES the whole list, while the "add" form appends — mixing them up has caused famous outages.' },
+
+    { t: 'Repeat the entire configuration on SW2',
+      do: [
+        'Switch to the <b>SW2</b> tab and enter configuration mode.',
+        'Create VLANs <b>10</b> and <b>20</b>.',
+        'Set <b>F0/1</b> to access VLAN <b>10</b> (PC3) and <b>F0/2</b> to access VLAN <b>20</b> (PC4).',
+        'Set <b>G0/1</b> to trunk mode, native VLAN <b>1001</b>, allowed list <b>10,20</b> — identical to SW1.',
+      ],
+      done: 'SW2 shows the same VLANs, the same port assignments and the same trunk settings as SW1.',
+      why: 'Both ends of a trunk must agree, and a tagged frame arriving for a VLAN the receiving switch has not created is silently dropped. Typing the block a second time is also the repetition that makes it stick.' },
+
+    { t: 'Verify the trunk from either switch',
+      do: [
+        'Run the trunk verification command.',
+        'Check all four facts on the one screen: the port is trunking, encapsulation is <b>802.1q</b>, native VLAN is <b>1001</b>, and the allowed list is <b>10,20</b>.',
+      ],
+      done: 'All four values match what you configured, on both switches.',
+      why: 'These are exactly the four things an exam question will alter to break a scenario, and the four things to check first when one VLAN works across a link and another does not.' },
+
+    { t: 'Test same-VLAN traffic across the trunk',
+      do: [
+        'From the <b>PC1</b> tab, ping <b>10.0.10.12</b> (PC3, same VLAN 10, other switch).',
+        'From the <b>PC2</b> tab, ping <b>10.0.20.12</b> (PC4, same VLAN 20, other switch).',
+      ],
+      done: 'Both pings succeed.',
+      why: 'It proves tagging works end to end: tagged at SW1, carried across the trunk, untagged again at SW2\'s access port. Distance stops mattering once the tags are right.' },
+
+    { t: 'Test cross-VLAN traffic — this one must FAIL',
+      do: [
+        'From the <b>PC1</b> tab (VLAN 10), ping <b>10.0.20.12</b> (PC4, in VLAN 20).',
+        'Expect it to time out.',
+      ],
+      done: 'The cross-VLAN ping fails while the same-VLAN pings succeed.',
+      why: 'A trunk carries both VLANs but never mixes them. Moving between VLANs still needs a router — which is precisely the next lab.' },
   ],
   steps: [
     { t: 'On SW1: VLANs and access ports.', c: ['enable', 'configure terminal', 'vlan 10', 'vlan 20', 'exit', 'interface f0/1', 'switchport mode access', 'switchport access vlan 10', 'interface f0/2', 'switchport mode access', 'switchport access vlan 20'] },
@@ -342,14 +727,71 @@ L({
   layout: { R1: [200, 12], SW1: [200, 68], PC1: [80, 105], PC2: [320, 105] },
   intro: `<b>The situation:</b> PC1 is in VLAN 10, PC2 is in VLAN 20, so they cannot talk to each other. A router is available — but it only has ONE cable to the switch.<br><b>Your goal:</b> let the two VLANs communicate through that single router cable. The trick is to split one physical router port into several <b>subinterfaces</b>, one per VLAN, each acting as that VLAN's gateway. Because everything balances on one cable, this design is nicknamed <b>"router on a stick"</b>.`,
   tasks: [
-    { t: 'On SW1: create VLANs 10 and 20', why: 'The hosts\' two worlds must exist on the switch first.' },
-    { t: 'On SW1: put F0/1 (PC1) into VLAN 10 and F0/2 (PC2) into VLAN 20 as access ports', why: 'Each PC sits in its own VLAN — right now they cannot talk to each other at all.' },
-    { t: 'On SW1: make G0/1 (the uplink to the router) a trunk', why: 'Both VLANs must ride up the same cable to the router — the "stick" in router-on-a-stick.' },
-    { t: 'On R1: turn on the physical interface G0/0 — but give it NO IP address', why: 'The physical port just needs to be up. The IP addresses will live on the subinterfaces you\'re about to create.' },
-    { t: 'On R1: create subinterface G0/0.10, mark it for VLAN tag 10 (encapsulation dot1q 10), then give it 10.0.10.1 mask 255.255.255.0', why: 'This logical interface answers VLAN 10\'s tagged frames, and its IP is VLAN 10\'s default gateway. The dot1q line must come before the IP.' },
-    { t: 'On R1: create subinterface G0/0.20 for VLAN tag 20, with 10.0.20.1 mask 255.255.255.0', why: 'One physical port, many logical interfaces — the whole trick. Matching subinterface numbers to VLAN IDs (.10 ↔ VLAN 10) is convention, but it keeps you sane.' },
-    { t: 'Verify with "show ip interface brief" — both subinterfaces should show their IPs, up/up', why: 'Subinterfaces inherit the physical port\'s state: if G0/0 is down, everything on it is down.' },
-    { t: 'From PC1, ping PC2 at 10.0.20.10', why: 'Trace the path in your head: PC1 → SW1 (tagged 10) → R1 routes it → back down the SAME cable (tagged 20) → SW1 → PC2. In and out of one physical port.' },
+    { t: 'On SW1, create the two VLANs the hosts live in',
+      do: [
+        'Work on the <b>SW1</b> tab, in global configuration mode.',
+        'Create VLAN <b>10</b> and VLAN <b>20</b>.',
+      ],
+      done: 'Both VLANs appear in <code>show vlan brief</code>.',
+      why: 'The two worlds have to exist on the switch before ports or a router can be attached to them.' },
+
+    { t: 'On SW1, place each PC into its VLAN',
+      do: [
+        'Set <b>F0/1</b> to access mode in VLAN <b>10</b> — this is PC1 (10.0.10.10).',
+        'Set <b>F0/2</b> to access mode in VLAN <b>20</b> — this is PC2 (10.0.20.10).',
+      ],
+      done: 'Each port shows under its VLAN in <code>show vlan brief</code>.',
+      why: 'The two PCs are now in separate broadcast domains AND separate IP subnets, so nothing can pass between them without a layer-3 hop.' },
+
+    { t: 'On SW1, trunk the uplink to the router',
+      do: [
+        'Select <b>G0/1</b> — the single cable to R1.',
+        'Set it to <b>trunk</b> mode.',
+      ],
+      done: 'Gi0/1 is listed by <code>show interfaces trunk</code>.',
+      why: 'Both VLANs must ride up this one cable to reach the router. That single trunked cable is the "stick" the design is named after.' },
+
+    { t: 'On R1, enable the physical interface but give it no IP address',
+      do: [
+        'Switch to the <b>R1</b> tab and enter configuration mode.',
+        'Enter interface <b>G0/0</b> and enable it.',
+        'Do <b>not</b> give this interface an address — leave it bare.',
+      ],
+      done: '<code>show ip interface brief</code> shows G0/0 as up/up with "unassigned".',
+      why: 'The physical port only needs to be up and carrying tagged frames. Every IP address in this design lives on a subinterface instead.' },
+
+    { t: 'On R1, build the VLAN 10 gateway as subinterface G0/0.10',
+      do: [
+        'Create subinterface <b>G0/0.10</b> (interface name, dot, number).',
+        'Tag it for VLAN <b>10</b> using dot1Q encapsulation — this command must come <b>before</b> the IP address.',
+        'Give it <b>10.0.10.1</b> with mask <b>255.255.255.0</b>.',
+      ],
+      done: 'G0/0.10 appears in <code>show ip interface brief</code> with 10.0.10.1, up/up.',
+      why: 'The encapsulation line is what binds this logical interface to VLAN 10\'s tagged frames, and its IP address becomes the default gateway every host in VLAN 10 is pointed at.' },
+
+    { t: 'On R1, build the VLAN 20 gateway as subinterface G0/0.20',
+      do: [
+        'Create subinterface <b>G0/0.20</b>.',
+        'Tag it for VLAN <b>20</b>, then give it <b>10.0.20.1</b> mask <b>255.255.255.0</b>.',
+      ],
+      done: 'Both subinterfaces are listed with their addresses.',
+      why: 'One physical port, many logical interfaces. Matching the subinterface number to the VLAN ID (.20 for VLAN 20) is only convention, but breaking it will confuse you at 2am.' },
+
+    { t: 'Verify both subinterfaces are up with the right addresses',
+      do: [
+        'Display the brief interface summary on R1.',
+        'Check that G0/0, G0/0.10 and G0/0.20 all read up/up and that the two subinterfaces carry the addresses you typed.',
+      ],
+      done: 'Three lines, all up/up, two of them addressed.',
+      why: 'Subinterfaces inherit the physical port\'s state — if G0/0 is down, every subinterface on it is down too, no matter how perfect their configuration.' },
+
+    { t: 'Prove inter-VLAN routing works',
+      do: [
+        'Switch to the <b>PC1</b> tab and ping <b>10.0.20.10</b> (PC2 in the other VLAN).',
+        'As it runs, trace the path in your head: PC1 → SW1 (tagged 10) → R1 routes it → back down the SAME cable (tagged 20) → SW1 → PC2.',
+      ],
+      done: 'PC1 gets replies from PC2.',
+      why: 'The packet enters and leaves the router on one physical wire. Fine for a small site; larger networks do the same job with SVIs on a layer-3 switch.' },
   ],
   steps: [
     { t: 'Configure the switch side.', c: ['enable', 'configure terminal', 'vlan 10', 'vlan 20', 'exit', 'interface f0/1', 'switchport mode access', 'switchport access vlan 10', 'interface f0/2', 'switchport mode access', 'switchport access vlan 20', 'interface g0/1', 'switchport mode trunk'] },
@@ -383,13 +825,60 @@ L({
   layout: { SW1: [110, 45], SW2: [290, 45] },
   intro: `<b>The situation:</b> two switches joined by a cable, with two automatic features running that most engineers deliberately switch off.<br><b>Your goal:</b> first watch <b>DTP</b> form a trunk by itself (convenient, but it means an attacker's device could do the same), then lock the port down manually. Then neutralise <b>VTP</b>, a feature that syncs VLAN lists between switches and has a nasty habit of wiping them instead. This is a lab about turning things off on purpose.`,
   tasks: [
-    { t: 'On SW1: set G0/1 to "dynamic desirable" mode', why: 'Desirable means "actively ask the other side to trunk". SW2\'s default mode (dynamic auto) means "say yes if asked".' },
-    { t: 'Run "show interfaces trunk" and confirm a trunk formed — without anyone typing "mode trunk"', why: 'That\'s DTP negotiation in action. Convenient — and exploitable: any device that speaks DTP could do the same. Memorize the combos: desirable+auto = trunk, auto+auto = nothing.' },
-    { t: 'On SW1: now hard-code G0/1 as a permanent trunk', why: 'Production stance: YOU decide the port\'s role. No guessing, no negotiation.' },
-    { t: 'On SW1: add "switchport nonegotiate" to stop DTP messages entirely', why: 'Belt and braces: even as a fixed trunk the port still SENDS DTP frames unless you silence them. An attacker can\'t negotiate with a port that won\'t talk.' },
-    { t: 'On SW2: do the same — permanent trunk plus nonegotiate', why: 'Both ends locked. This pair of commands is the standard hardening for every inter-switch link.' },
-    { t: 'On both switches: set VTP mode to transparent', why: 'Opts out of automatic VLAN database syncing. A stray switch with a higher revision number can otherwise WIPE every VLAN in the domain — the infamous "VTP bomb".' },
-    { t: 'On both switches: set the VTP domain name to NETDRILL', why: 'The domain scopes who would exchange VTP at all. Setting it deliberately prevents accidentally joining a neighbor\'s domain someday.' },
+    { t: 'On SW1, set G0/1 to dynamic desirable and let DTP do the work',
+      do: [
+        'Work on the <b>SW1</b> tab, in configuration mode.',
+        'Enter interface <b>G0/1</b> and set the switchport mode to <b>dynamic desirable</b>.',
+        'Leave SW2 completely alone — its port is still on the factory default, dynamic auto.',
+      ],
+      done: 'The command is accepted with no error.',
+      why: 'Desirable means "I will actively ask the other side to trunk". Auto means "I will agree if asked, but never ask". Together they form a trunk with nobody typing the word trunk.' },
+
+    { t: 'Confirm a trunk formed by itself',
+      do: [
+        'Display the trunk status on SW1.',
+        'Note that Gi0/1 is trunking even though nobody configured trunk mode on either switch.',
+      ],
+      done: 'Gi0/1 appears in the trunk list.',
+      why: 'That is DTP negotiation, and it is exploitable: any device that speaks DTP could negotiate a trunk and see every VLAN. Memorise the combinations — desirable+auto = trunk, auto+auto = no trunk.' },
+
+    { t: 'Take control: hard-code G0/1 as a permanent trunk on SW1',
+      do: [
+        'Still inside <b>G0/1</b>, set the mode to <b>trunk</b> outright.',
+      ],
+      done: 'The port is a static trunk rather than a negotiated one.',
+      why: 'The production stance is that YOU decide a port\'s role. Nothing about your network should depend on two devices agreeing between themselves.' },
+
+    { t: 'Silence DTP on SW1\'s trunk',
+      do: [
+        'Still inside <b>G0/1</b>, add the command that stops the port sending DTP frames altogether.',
+      ],
+      done: '<code>show running-config</code> shows <code>switchport nonegotiate</code> under Gi0/1.',
+      why: 'Even a hard-coded trunk keeps sending DTP frames unless you stop it. An attacker cannot negotiate with a port that refuses to talk.' },
+
+    { t: 'Lock down the far end on SW2 the same way',
+      do: [
+        'Switch to the <b>SW2</b> tab and enter configuration mode.',
+        'On <b>G0/1</b>, set the mode to <b>trunk</b> and add <b>nonegotiate</b>.',
+      ],
+      done: 'Both ends are static trunks with DTP disabled.',
+      why: 'These two commands together are the standard hardening for every switch-to-switch link. Both ends must match — a nonegotiate trunk facing a dynamic-auto port never forms at all.' },
+
+    { t: 'Put both switches into VTP transparent mode',
+      do: [
+        'In global configuration mode on <b>SW1</b>, set the VTP mode to <b>transparent</b>.',
+        'Do exactly the same on <b>SW2</b>.',
+      ],
+      done: '<code>show vtp status</code> reports "Transparent" on both switches.',
+      why: 'Transparent means "I will never sync my VLAN database with anybody". It is protection against a switch with a higher revision number wiping every VLAN in the domain — the infamous VTP bomb.' },
+
+    { t: 'Set the VTP domain name to NETDRILL on both switches',
+      do: [
+        'On both <b>SW1</b> and <b>SW2</b>, set the VTP domain name to exactly <b>NETDRILL</b>.',
+        'Confirm with the VTP status command on each.',
+      ],
+      done: 'Both switches report VTP domain NETDRILL and mode Transparent.',
+      why: 'The domain name scopes who would exchange VTP information at all. Setting it deliberately stops a device accidentally joining a neighbour\'s domain one day.' },
   ],
   steps: [
     { t: 'On SW1, make G0/1 actively negotiate. SW2 defaults to dynamic auto, so the link becomes a trunk.', c: ['enable', 'configure terminal', 'interface g0/1', 'switchport mode dynamic desirable', 'do show interfaces trunk'], note: 'desirable + auto = trunk. auto + auto = access (nobody initiates).' },
@@ -425,13 +914,62 @@ L({
   layout: { SW1: [200, 12], SW2: [90, 80], SW3: [310, 80], PC1: [200, 110] },
   intro: `<b>The situation:</b> three switches cabled in a triangle. That loop would flood the network to death — Spanning Tree Protocol prevents it by automatically blocking one path, and electing one switch as the "root" that all traffic centres on.<br><b>Your goal:</b> stop leaving that election to chance. Choose which switch becomes root (and which is the backup), upgrade all three to the faster version of STP, and protect the port where a PC plugs in.`,
   tasks: [
-    { t: 'On SW1: switch the spanning-tree mode to rapid-pvst', why: 'Rapid PVST+ recovers from failures in 1-2 seconds instead of 30-50. There\'s no reason to run classic on modern gear.' },
-    { t: 'On SW1: make it the root bridge for VLAN 1 (use "root primary", or set priority 24576 directly)', why: 'Left alone, the election is won by the lowest MAC address — often the oldest switch in the closet, dragging all traffic through it. Choose your root on purpose.' },
-    { t: 'On SW2: rapid-pvst mode, and make it the BACKUP root ("root secondary", priority 28672)', why: 'A deterministic plan B: if SW1 dies, SW2\'s 28672 beats every default-priority switch (32768) to become the new root.' },
-    { t: 'On SW3: rapid-pvst mode only', why: 'Every switch must run the same STP flavor — mixed modes fall back to slow classic behavior on those links.' },
-    { t: 'On SW1\'s host port F0/1: enable portfast', why: 'Skips the 30-second listening/learning wait so the PC gets instant network (and DHCP doesn\'t time out). Host ports only — never on a port facing another switch!' },
-    { t: 'On the same port: enable bpduguard', why: 'PortFast\'s bodyguard: if a switch ever appears on this "host" port, the port shuts itself down instead of creating a loop. Always deploy the pair together.' },
-    { t: 'On SW1: run "show spanning-tree" and find the line "This bridge is the root"', why: 'The verification: root bridge identity, your priority (24576 + VLAN number), and each port\'s role. Reading this output is a guaranteed exam question.' },
+    { t: 'On SW1, switch spanning tree to the fast version (Rapid PVST+)',
+      do: [
+        'Work on the <b>SW1</b> tab. Enter privileged EXEC, then global configuration mode.',
+        'Change the spanning-tree mode to <b>rapid-pvst</b>.',
+      ],
+      done: '<code>show running-config</code> shows <code>spanning-tree mode rapid-pvst</code>.',
+      why: 'Rapid PVST+ (802.1w) recovers from a failure in one or two seconds instead of 30-50. There is no reason to run the classic version on modern hardware.' },
+
+    { t: 'Make SW1 the root bridge for VLAN 1 on purpose',
+      do: [
+        'Still on <b>SW1</b>, claim the root role for <b>VLAN 1</b>.',
+        'Either use the <b>root primary</b> macro, or set the priority to <b>24576</b> directly — the lab check accepts the resulting priority of 24576 either way.',
+      ],
+      done: '<code>show spanning-tree</code> on SW1 says "This bridge is the root".',
+      why: 'Left alone, the election is won by the lowest MAC address — usually the oldest switch in the cupboard, which then carries all your traffic. Priorities move in steps of 4096 because the VLAN ID occupies the low bits of the bridge ID.' },
+
+    { t: 'On SW2, use Rapid PVST+ and make it the backup root',
+      do: [
+        'Switch to the <b>SW2</b> tab and enter configuration mode.',
+        'Set the spanning-tree mode to <b>rapid-pvst</b>.',
+        'Claim the <b>secondary</b> root role for VLAN 1 — the macro sets priority <b>28672</b>, which you may also type directly.',
+      ],
+      done: 'SW2 reports priority 28672 for VLAN 1.',
+      why: 'A deterministic plan B. If SW1 dies, 28672 beats every default-priority switch (32768), so you know in advance which box becomes root.' },
+
+    { t: 'On SW3, switch to Rapid PVST+ as well',
+      do: [
+        'Switch to the <b>SW3</b> tab and set the spanning-tree mode to <b>rapid-pvst</b>.',
+        'Leave its priority at the default — SW3 is not meant to be root.',
+      ],
+      done: 'All three switches report the same spanning-tree mode.',
+      why: 'Every switch must run the same flavour. One switch left on classic PVST+ drags its links back to the slow timers, losing the benefit everywhere it touches.' },
+
+    { t: 'On SW1, make the PC-facing port F0/1 an edge port',
+      do: [
+        'Back on <b>SW1</b>, enter interface <b>F0/1</b> — the port PC1 plugs into.',
+        'Enable <b>portfast</b> on it.',
+        'Read the warning IOS prints as you type it.',
+      ],
+      done: '<code>show running-config</code> shows <code>spanning-tree portfast</code> under Fa0/1.',
+      why: 'An edge port skips the listening and learning states and forwards immediately, so a PC gets a DHCP address at once instead of waiting 30 seconds. Never use it on a port facing another switch — which is exactly what the warning says.' },
+
+    { t: 'Protect that edge port with BPDU guard',
+      do: [
+        'Still inside <b>F0/1</b>, enable BPDU guard on the port.',
+      ],
+      done: '<code>show running-config</code> shows <code>spanning-tree bpduguard enable</code> under Fa0/1.',
+      why: 'A portfast port should never receive a BPDU. If it does, somebody has plugged a switch into a desk port — BPDU guard err-disables the port rather than letting that device reshape your topology. Always deploy the pair together.' },
+
+    { t: 'Verify the tree and read your own handiwork',
+      do: [
+        'On <b>SW1</b>, display the spanning-tree status.',
+        'Find three things: the line saying this bridge is the root, the priority value (24576 plus the VLAN number), and the role of each port.',
+      ],
+      done: 'SW1 is root, and you can name the role of every port on screen.',
+      why: 'Reading this output is a guaranteed exam question. Each non-root switch has exactly one root port; every segment has one designated port; whatever is left over is blocked, and that is the loop being broken.' },
   ],
   steps: [
     { t: 'Upgrade SW1 to Rapid PVST+ and claim root.', c: ['enable', 'configure terminal', 'spanning-tree mode rapid-pvst', 'spanning-tree vlan 1 root primary'], note: '<code>root primary</code> is a macro that sets priority 24576 (or lower if needed). You could also type <code>spanning-tree vlan 1 priority 24576</code> directly.' },
@@ -468,13 +1006,61 @@ L({
   layout: { PC1: [40, 45], SW1: [140, 45], SW2: [260, 45], PC2: [360, 45] },
   intro: `<b>The situation:</b> two cables run between SW1 and SW2 for extra bandwidth — but Spanning Tree sees a loop and blocks one of them, so you only ever get the speed of one cable.<br><b>Your goal:</b> bundle both cables into a single logical link (an <b>EtherChannel</b>). Spanning Tree then sees one link instead of two, blocks nothing, and you get the bandwidth you paid for. You'll use LACP, the standard protocol for negotiating the bundle.`,
   tasks: [
-    { t: 'On SW1: select both uplinks (G0/1 - 2) and put them in channel-group 1, mode active', why: 'Two parallel cables normally mean STP blocks one. Bundling makes them one logical link. "active" = this side initiates the LACP conversation.' },
-    { t: 'Watch the log line: IOS auto-creates "interface Port-channel1"', why: 'The bundle gets its own logical interface — that\'s what you\'ll configure from now on.' },
-    { t: 'On SW2: same two ports into channel-group 1, but mode passive', why: '"passive" only responds. active+passive forms a bundle; passive+passive never does — the same trap as DTP auto+auto. Exam favorite.' },
-    { t: 'On SW1: enter interface port-channel 1 and make it a trunk', why: 'Configure the logical interface and the settings push down to both member ports — keeping them identical, which bundles require.' },
-    { t: 'On SW2: trunk its port-channel 1 too', why: 'Both ends of the (logical) link need matching trunk config, exactly like a normal trunk.' },
-    { t: 'Verify with "show etherchannel summary" — look for flags SU on Po1 and (P) on the members', why: 'S = layer 2, U = in use, P = bundled. An (I) means stand-alone: the modes didn\'t match and the bundle never formed.' },
-    { t: 'From PC1, ping PC2 at 10.0.0.12', why: 'Proof the bundle forwards: STP sees one link, blocks nothing, and both cables carry traffic.' },
+    { t: 'On SW1, bundle both uplinks into channel-group 1 using LACP active mode',
+      do: [
+        'Work on the <b>SW1</b> tab, in global configuration mode.',
+        'Select both uplinks at once with an interface range: <b>G0/1 and G0/2</b>.',
+        'Put them into <b>channel-group 1</b> with mode <b>active</b>.',
+      ],
+      done: 'IOS logs the creation of a new interface called Port-channel1.',
+      why: 'Two parallel cables normally mean spanning tree blocks one of them. Bundling turns them into a single logical link, so nothing is blocked. "active" means this side starts the LACP conversation.' },
+
+    { t: 'Notice the logical interface IOS created for you',
+      do: [
+        'Read the log line that appeared: <b>Port-channel1</b> now exists as an interface in its own right.',
+        'You did not create it — the channel-group command did.',
+      ],
+      done: 'Port-channel1 appears in <code>show ip interface brief</code> or <code>show etherchannel summary</code>.',
+      why: 'From here on you configure the bundle through that logical interface, and the settings push down to every member port — which is what keeps the members identical, as a bundle requires.' },
+
+    { t: 'On SW2, bundle the same two ports — but in LACP passive mode',
+      do: [
+        'Switch to the <b>SW2</b> tab and enter configuration mode.',
+        'Select <b>G0/1 and G0/2</b> as a range.',
+        'Put them into <b>channel-group 1</b> with mode <b>passive</b>.',
+      ],
+      done: 'SW2 also reports a new Port-channel1 interface.',
+      why: 'Passive means "I will answer if asked, but never ask". Active+passive forms a bundle; passive+passive never does — the same trap as DTP auto+auto, and a favourite exam question.' },
+
+    { t: 'On SW1, make the bundle a trunk',
+      do: [
+        'Back on <b>SW1</b>, enter interface <b>Port-channel 1</b>.',
+        'Set it to <b>trunk</b> mode.',
+      ],
+      done: 'Po1 is listed by <code>show interfaces trunk</code>.',
+      why: 'Configure the logical interface, not the members. Anything you set here is applied to both physical ports, keeping them identical — a mismatch between members breaks the bundle.' },
+
+    { t: 'On SW2, trunk its bundle too',
+      do: [
+        'On <b>SW2</b>, enter interface <b>Port-channel 1</b> and set it to <b>trunk</b> mode.',
+      ],
+      done: 'Both switches show Po1 as a trunk.',
+      why: 'Both ends of the logical link need matching trunk configuration, exactly as with an ordinary trunk.' },
+
+    { t: 'Verify the bundle actually formed',
+      do: [
+        'Display the EtherChannel summary on either switch.',
+        'Look at the flags: <b>SU</b> next to Po1, and <b>(P)</b> next to each member port.',
+      ],
+      done: 'Po1 reads SU and both members read (P).',
+      why: 'S means layer 2, U means in use, P means bundled. An <b>(I)</b> means the port is standalone — the modes did not match and the bundle never formed, which is the first thing to check when a channel misbehaves.' },
+
+    { t: 'Prove traffic crosses the bundle',
+      do: [
+        'Switch to the <b>PC1</b> tab and ping <b>10.0.0.12</b> (PC2 on the other switch).',
+      ],
+      done: 'The ping succeeds.',
+      why: 'Spanning tree now sees one logical link instead of two, so it blocks nothing and both cables carry traffic — the bandwidth you paid for.' },
   ],
   steps: [
     { t: 'Bundle SW1\'s links with LACP in active mode.', c: ['enable', 'configure terminal', 'interface range g0/1 - 2', 'channel-group 1 mode active'], note: 'IOS auto-creates interface Port-channel1 — watch the log line.' },
@@ -517,17 +1103,92 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.R2.hostname = 'R2'; topo.devs.R3.hostname = 'R3';
   },
   tasks: [
-    { t: 'Look around first: on R1, run "show ip interface brief" — the addresses are already configured for you', why: 'This lab is pure OSPF. Know the map: each router\'s LAN plus the /30 links between routers (10.0.12.x between R1-R2, 10.0.23.x between R2-R3).' },
-    { t: 'On R1: start OSPF with "router ospf 1"', why: 'The "1" is the process ID — it only matters locally and does NOT need to match between routers (common misconception).' },
-    { t: 'On R1: set the router ID to 1.1.1.1', why: 'Without this, OSPF picks an ID from interface addresses. Setting x.x.x.x style yourself makes every neighbor table instantly readable.' },
-    { t: 'On R1: advertise the LAN — "network 10.0.1.0 0.0.0.255 area 0"', why: 'The strange second number is a WILDCARD mask (an inverted subnet mask): 0.0.0.255 means "match the whole /24". This enables OSPF on any interface whose address matches.' },
-    { t: 'On R1: advertise the link to R2 — "network 10.0.12.0 0.0.0.3 area 0"', why: '0.0.0.3 is the wildcard for a /30. Same area (0) everywhere — this whole lab is a single-area design.' },
-    { t: 'On R1: make G0/0 passive', why: 'Only PCs live on the LAN — no OSPF neighbors. Passive stops the pointless hello packets but still advertises the subnet to others.' },
-    { t: 'On R2: OSPF process 1, router-id 2.2.2.2, advertise BOTH /30 links (10.0.12.0 and 10.0.23.0, wildcard 0.0.0.3, area 0)', why: 'The middle router glues the two halves together. It has no LAN, so nothing needs to be passive.' },
-    { t: 'On R3: OSPF process 1, router-id 3.3.3.3, advertise 10.0.23.0/30 and its LAN 10.0.3.0/24 into area 0, passive G0/1', why: 'The mirror of R1. Once all three routers advertise, every subnet gets learned everywhere — with zero static routes typed.' },
-    { t: 'On R2: run "show ip ospf neighbor" — you want TWO neighbors, both in state FULL', why: 'FULL means the routers\' network databases are fully synchronized. Adjacency requirements: same subnet, same area, matching timers, unique router IDs.' },
-    { t: 'On R1: run "show ip route" and find the routes marked "O"', why: 'Those are OSPF-learned routes — R1 now knows about networks it never touched. This is the payoff over static routing.' },
-    { t: 'From the PC1 tab, ping PC3 at 10.0.3.10', why: 'End-to-end proof: the packet crosses three routers using only routes OSPF discovered by itself.' },
+    { t: 'Survey the network before configuring anything',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC and display the brief interface summary.',
+        'Note the addressing that is already in place: each router\'s LAN plus the /30 links — <b>10.0.12.x</b> between R1 and R2, <b>10.0.23.x</b> between R2 and R3.',
+      ],
+      done: 'You can describe which subnet sits on each interface without looking again.',
+      why: 'This lab is pure OSPF; the addressing is done for you. Knowing the map is what lets you write correct network statements instead of guessing wildcard masks.' },
+
+    { t: 'On R1, start the OSPF process',
+      do: [
+        'Enter global configuration mode and start OSPF with process ID <b>1</b>.',
+        'Your prompt moves into router configuration mode, <code>R1(config-router)#</code>.',
+      ],
+      done: 'The prompt reads <code>R1(config-router)#</code>.',
+      why: 'The process ID is only locally significant — it does <b>not</b> have to match on the other routers. That is one of the most persistent misconceptions in the whole exam.' },
+
+    { t: 'On R1, pin the router ID to 1.1.1.1',
+      do: [
+        'Inside the OSPF process, set the router ID to <b>1.1.1.1</b>.',
+      ],
+      done: '<code>show ip protocols</code> reports Router ID 1.1.1.1.',
+      why: 'Without this, OSPF picks an ID from the highest loopback or interface address, and neighbour tables become unreadable. Setting it in x.x.x.x form yourself makes every output instantly legible.' },
+
+    { t: 'On R1, advertise the LAN 10.0.1.0/24 into area 0',
+      do: [
+        'Still inside the OSPF process, write a network statement for <b>10.0.1.0</b> with wildcard <b>0.0.0.255</b>, in <b>area 0</b>.',
+      ],
+      done: 'No error; the statement appears in <code>show running-config</code> under router ospf 1.',
+      why: 'The second number is a WILDCARD mask — an inverted subnet mask, so 0.0.0.255 covers a whole /24. The statement does not advertise a network directly; it selects which interfaces run OSPF.' },
+
+    { t: 'On R1, advertise the /30 link to R2',
+      do: [
+        'Add a second network statement for <b>10.0.12.0</b> with wildcard <b>0.0.0.3</b>, in <b>area 0</b>.',
+      ],
+      done: 'Two network statements are listed under the OSPF process.',
+      why: '0.0.0.3 is the wildcard for a /30. Every statement in this lab uses area 0, because this is a single-area design — the only kind CCNA configures.' },
+
+    { t: 'On R1, silence OSPF on the LAN interface',
+      do: [
+        'Inside the OSPF process, make interface <b>G0/0</b> passive.',
+      ],
+      done: '<code>show ip protocols</code> lists G0/0 under passive interfaces.',
+      why: 'Only PCs live on that LAN, so hello packets there are wasted and mildly dangerous. Passive stops the hellos but still advertises the subnet to the rest of the network.' },
+
+    { t: 'On R2, repeat the pattern for the middle router',
+      do: [
+        'Switch to the <b>R2</b> tab and enter configuration mode.',
+        'Start OSPF process <b>1</b> and set the router ID to <b>2.2.2.2</b>.',
+        'Advertise <b>both</b> /30 links: <b>10.0.12.0 0.0.0.3</b> and <b>10.0.23.0 0.0.0.3</b>, both in area 0.',
+        'R2 has no LAN, so nothing here needs to be passive.',
+      ],
+      done: 'R2 lists two network statements and router ID 2.2.2.2.',
+      why: 'The middle router glues the two halves of the network together. Its adjacencies are what let R1 and R3 learn about each other at all.' },
+
+    { t: 'On R3, mirror what you did on R1',
+      do: [
+        'Switch to the <b>R3</b> tab and enter configuration mode.',
+        'Start OSPF process <b>1</b>, router ID <b>3.3.3.3</b>.',
+        'Advertise the link <b>10.0.23.0 0.0.0.3</b> and the LAN <b>10.0.3.0 0.0.0.255</b>, both in area 0.',
+        'Make interface <b>G0/1</b> (the LAN side) passive.',
+      ],
+      done: 'R3 has two network statements and a passive LAN interface.',
+      why: 'R3 is the mirror image of R1. Once all three advertise, every subnet is learned everywhere without a single static route being typed.' },
+
+    { t: 'Confirm the adjacencies formed',
+      do: [
+        'On <b>R2</b>, display the OSPF neighbour table.',
+        'You want <b>two</b> neighbours listed, both in state <b>FULL</b>.',
+      ],
+      done: 'R2 shows R1 and R3 as FULL neighbours.',
+      why: 'FULL means the two routers have identical link-state databases. The requirements to get there — same subnet, same area, matching timers, unique router IDs — are examined constantly.' },
+
+    { t: 'Look at the routes OSPF built for you',
+      do: [
+        'On <b>R1</b>, display the routing table.',
+        'Find the entries marked with the code <b>O</b> and note their metrics.',
+      ],
+      done: 'R1 has O routes to 10.0.23.0/30 and 10.0.3.0/24 — networks it is not connected to.',
+      why: 'This is the payoff over static routing. R1 knows about networks nobody told it about, and it will keep up automatically when the topology changes.' },
+
+    { t: 'Prove it end to end',
+      do: [
+        'Switch to the <b>PC1</b> tab and ping <b>10.0.3.10</b> (PC3, three routers away).',
+      ],
+      done: 'PC1 gets replies from PC3.',
+      why: 'The packet crosses three routers using only paths OSPF discovered by itself, in both directions, with no routes typed by hand.' },
   ],
   steps: [
     { t: 'Enable OSPF on R1.', c: ['enable', 'configure terminal', 'router ospf 1', 'router-id 1.1.1.1', 'network 10.0.1.0 0.0.0.255 area 0', 'network 10.0.12.0 0.0.0.3 area 0', 'passive-interface g0/0'], note: 'Network statements use <b>wildcard masks</b> (inverted subnet masks): /24 → 0.0.0.255, /30 → 0.0.0.3. They select which <em>interfaces</em> join OSPF.' },
@@ -565,14 +1226,67 @@ L({
   layout: { R1: [110, 12], R2: [290, 12], SW1: [200, 68], PC1: [200, 112] },
   intro: `<b>The situation:</b> a PC can only be given ONE default gateway address. If that router dies, the PC is cut off — even if a second router sits right next to it, unused.<br><b>Your goal:</b> make two routers share a single "virtual" gateway address (10.0.0.1) that the PC points at. One router answers for it normally; the other takes over automatically within seconds if the first fails, and the PC never notices. The protocol that does this is <b>HSRP</b>.`,
   tasks: [
-    { t: 'On R1: give G0/0 the real address 10.0.0.2 mask 255.255.255.0 and turn it on', why: 'Each router keeps its own real address. The shared gateway address comes next, on top of this.' },
-    { t: 'On R1: add the shared gateway with "standby 1 ip 10.0.0.1"', why: 'Group 1\'s virtual IP. No router owns 10.0.0.1 outright — the group answers for it together.' },
-    { t: 'On R1: set standby priority 110', why: 'Higher priority wins the Active election. 110 beats R2\'s default of 100, so R1 becomes Active on purpose, not by accident.' },
-    { t: 'On R1: enable preempt', why: 'Crucial detail: WITHOUT preempt, a recovered R1 stays Standby forever even at priority 110. HSRP does not take back the Active role by default — classic exam trap.' },
-    { t: 'On R2: real address 10.0.0.3 mask 255.255.255.0, port on, and the same "standby 1 ip 10.0.0.1"', why: 'The hot spare. It listens to R1\'s hellos (every 3s) and takes over the virtual IP if R1 goes silent for 10s — the PCs never notice.' },
-    { t: 'On both routers: run "show standby brief"', why: 'The truth table: group, priority, P flag (preempt), who is Active, who is Standby, and the virtual IP.' },
-    { t: 'Confirm R1 says Active and R2 says Standby', why: 'If both say Active, they can\'t hear each other; if the wrong one is Active, check the priorities.' },
-    { t: 'From PC1, ping the gateway 10.0.0.1', why: 'The magic: an address no physical router owns, answering anyway. The Active router speaks for the virtual IP and virtual MAC (0000.0c07.ac01).' },
+    { t: 'On R1, address G0/0 with its own real IP and enable it',
+      do: [
+        'Work on the <b>R1</b> tab, in configuration mode.',
+        'Enter interface <b>G0/0</b>, give it <b>10.0.0.2</b> with mask <b>255.255.255.0</b>, and enable the interface.',
+      ],
+      done: 'G0/0 is up/up with 10.0.0.2.',
+      why: 'Each router keeps its own real address for management and troubleshooting. The shared gateway address is added on top of it, not instead of it.' },
+
+    { t: 'On R1, create HSRP group 1 with the virtual gateway 10.0.0.1',
+      do: [
+        'Still inside <b>G0/0</b>, configure standby group <b>1</b> with virtual IP <b>10.0.0.1</b>.',
+        'Note that this is the address the PC is already pointed at as its default gateway.',
+      ],
+      done: '<code>show standby brief</code> lists group 1 with virtual IP 10.0.0.1.',
+      why: 'No router owns 10.0.0.1 outright — the group answers for it together, and whichever router is Active replies to ARP for it with a virtual MAC (0000.0c07.acXX).' },
+
+    { t: 'On R1, raise the HSRP priority to 110',
+      do: [
+        'Still in group <b>1</b> on G0/0, set the priority to <b>110</b>.',
+      ],
+      done: 'The priority column in <code>show standby brief</code> reads 110.',
+      why: 'Higher priority wins the Active election. 110 beats R2\'s default of 100, so R1 becomes Active because you decided it should — not because of a MAC-address tiebreak.' },
+
+    { t: 'On R1, enable preempt',
+      do: [
+        'Still in group <b>1</b>, enable <b>preempt</b>.',
+      ],
+      done: 'A <b>P</b> appears in the state column of <code>show standby brief</code>.',
+      why: 'Without preempt, a recovered R1 stays Standby forever even with the higher priority — HSRP does not take the Active role back by default. It is one of the most commonly tested details in the whole topic.' },
+
+    { t: 'On R2, build the standby side of the same group',
+      do: [
+        'Switch to the <b>R2</b> tab and enter configuration mode.',
+        'On interface <b>G0/0</b>, set the address <b>10.0.0.3</b> mask <b>255.255.255.0</b> and enable it.',
+        'Add standby group <b>1</b> with the same virtual IP <b>10.0.0.1</b>.',
+        'Leave its priority at the default of 100.',
+      ],
+      done: 'R2 shows group 1 with the same virtual IP and priority 100.',
+      why: 'R2 is the hot spare. It listens for R1\'s hellos every 3 seconds and takes over the virtual IP if they stop for 10 seconds — fast enough that users rarely notice.' },
+
+    { t: 'Read the HSRP state on both routers',
+      do: [
+        'Run the brief standby summary on <b>R1</b>, then on <b>R2</b>.',
+        'Read each column: group number, priority, the P flag for preempt, the state, the address of the other router, and the virtual IP.',
+      ],
+      done: 'Both routers display a group 1 line.',
+      why: 'This one screen answers every HSRP question: who is Active, who is Standby, what the virtual address is, and whether preempt is on.' },
+
+    { t: 'Confirm R1 is Active and R2 is Standby',
+      do: [
+        'Check that <b>R1</b> reports state <b>Active</b> and <b>R2</b> reports <b>Standby</b>.',
+      ],
+      done: 'The two routers report opposite, complementary states.',
+      why: 'If both say Active they cannot hear each other — a VLAN or cabling fault. If the wrong one is Active, check the priorities and whether preempt was ever configured.' },
+
+    { t: 'Ping the virtual gateway from the PC',
+      do: [
+        'Switch to the <b>PC1</b> tab and ping <b>10.0.0.1</b>.',
+      ],
+      done: 'PC1 gets replies from an address no single router owns.',
+      why: 'That is the whole trick: the host has one gateway address, and two routers stand behind it. If the Active router fails, the Standby answers for the same address within seconds and the PC never knows.' },
   ],
   steps: [
     { t: 'Configure R1 as the active-to-be.', c: ['enable', 'configure terminal', 'interface g0/0', 'ip address 10.0.0.2 255.255.255.0', 'no shutdown', 'standby 1 ip 10.0.0.1', 'standby 1 priority 110', 'standby 1 preempt'], note: 'Priority 110 beats the default 100. <code>preempt</code> lets R1 reclaim Active when it comes back from an outage.' },
@@ -604,15 +1318,77 @@ L({
   layout: { R1: [120, 45], R2: [280, 45] },
   intro: `<b>The situation:</b> two routers connected to each other, this time addressed with IPv6 instead of IPv4. IPv6 routing is switched off by default, so nothing will forward yet.<br><b>Your goal:</b> turn on IPv6 routing, address the link between the routers and each router's own network, then give each one a static route to the other's network. Along the way you'll meet two things IPv4 doesn't have: automatic <b>link-local</b> addresses, and <b>EUI-64</b>, where the router builds half of its own address from its MAC address.`,
   tasks: [
-    { t: 'On R1: enable IPv6 routing with "ipv6 unicast-routing"', why: 'A Cisco router will happily hold IPv6 addresses but won\'t ROUTE v6 packets until this is on. It\'s off by default — the #1 IPv6 exam gotcha.' },
-    { t: 'On R1: give G0/1 (the link to R2) the address 2001:db8:12::1/64 and turn it on', why: 'The shared link network. 2001:db8::/32 is the official "documentation" prefix — safe for labs and books.' },
-    { t: 'On R1: give G0/0 (its LAN) the address 2001:db8:1::1/64 and turn it on', why: 'Fully manual IPv6 addressing — you choose the whole address, just like IPv4.' },
-    { t: 'On R2: enable ipv6 unicast-routing, then give G0/1 the address 2001:db8:12::2/64', why: 'The other end of the link. EVERY router that should route v6 needs unicast-routing individually.' },
-    { t: 'On R2: address G0/0 differently — give it only the prefix 2001:db8:2::/64 with the "eui-64" option', why: 'The second addressing style: the router builds the host half from its own MAC address (split the MAC, wedge FFFE in the middle, flip bit 7). You WILL compute one of these on the exam.' },
-    { t: 'Run "show ipv6 interface brief" and find the FE80:: addresses you never configured', why: 'Every v6 interface auto-creates a link-local FE80:: address — used for next hops and router-to-router chatter. They exist whether you asked or not.' },
-    { t: 'On R1: add a static route to R2\'s LAN — "ipv6 route 2001:db8:2::/64 2001:db8:12::2"', why: 'Same shape as IPv4 statics: destination prefix, then next hop.' },
-    { t: 'On R2: add the mirror route to 2001:db8:1::/64 via 2001:db8:12::1', why: 'The both-directions rule never goes away: without the return route, replies die at R2.' },
-    { t: 'Verify with "show ipv6 route" on both routers', why: 'C = connected, S = your statics. Confirm each router now knows the other\'s LAN.' },
+    { t: 'On R1, switch on IPv6 routing',
+      do: [
+        'Work on the <b>R1</b> tab. Enter privileged EXEC, then global configuration mode.',
+        'Enable IPv6 unicast routing.',
+      ],
+      done: '<code>show running-config</code> contains <code>ipv6 unicast-routing</code>.',
+      why: 'A Cisco router will hold IPv6 addresses and answer pings to itself without this, but it will not forward a single IPv6 packet between interfaces. It is off by default and it is the number one IPv6 exam gotcha.' },
+
+    { t: 'On R1, address the link to R2 with 2001:db8:12::1/64',
+      do: [
+        'Enter interface <b>G0/1</b> — the cable to R2.',
+        'Give it the IPv6 address <b>2001:db8:12::1/64</b> (the prefix length goes on the end after a slash, unlike IPv4).',
+        'Enable the interface.',
+      ],
+      done: '<code>show ipv6 interface brief</code> shows G0/1 up with that address.',
+      why: 'This is the shared transit network. 2001:db8::/32 is the official documentation prefix, reserved for books and labs, so it is safe to use anywhere.' },
+
+    { t: 'On R1, address the LAN interface with 2001:db8:1::1/64',
+      do: [
+        'Enter interface <b>G0/0</b>, give it <b>2001:db8:1::1/64</b>, and enable it.',
+      ],
+      done: 'Both R1 interfaces are listed with global addresses.',
+      why: 'This is fully manual IPv6 addressing — you choose every bit of the address, exactly as you would in IPv4.' },
+
+    { t: 'On R2, enable IPv6 routing and address the other end of the link',
+      do: [
+        'Switch to the <b>R2</b> tab and enter configuration mode.',
+        'Enable IPv6 unicast routing on this router too.',
+        'On interface <b>G0/1</b>, set <b>2001:db8:12::2/64</b> and enable the interface.',
+      ],
+      done: 'Both ends of the transit link are addressed inside 2001:db8:12::/64.',
+      why: 'Every router that should route IPv6 needs the unicast-routing command individually — it is not learned or inherited from a neighbour.' },
+
+    { t: 'On R2, let the router build its own LAN address with EUI-64',
+      do: [
+        'Enter interface <b>G0/0</b>.',
+        'Give it the prefix <b>2001:db8:2::/64</b> with the <b>eui-64</b> keyword on the end, instead of a full address.',
+        'Enable the interface, then look at the address the router generated.',
+      ],
+      done: '<code>show ipv6 interface brief</code> shows a 2001:DB8:2:: address with a long host portion you never typed.',
+      why: 'EUI-64 builds the host half from the interface MAC: split the MAC in two, wedge FFFE into the middle, and flip the seventh bit. You will be asked to compute one by hand in the exam — compare the result with the MAC in <code>show interfaces g0/0</code>.' },
+
+    { t: 'Find the link-local addresses nobody configured',
+      do: [
+        'On either router, display the brief IPv6 interface summary.',
+        'Notice that every interface also carries an address starting <b>FE80::</b>.',
+      ],
+      done: 'You can point at an FE80:: address on each interface.',
+      why: 'Every IPv6 interface creates a link-local address automatically. Routing protocols and next-hop resolution use them constantly, and they exist whether you asked for them or not.' },
+
+    { t: 'On R1, add a static IPv6 route to R2\'s LAN',
+      do: [
+        'In global configuration mode on <b>R1</b>, create an IPv6 route for <b>2001:db8:2::/64</b> via next hop <b>2001:db8:12::2</b>.',
+      ],
+      done: '<code>show ipv6 route</code> on R1 shows an S entry for 2001:DB8:2::/64.',
+      why: 'The shape is identical to an IPv4 static route: destination prefix first, then the next hop. Almost everything you already know transfers straight across.' },
+
+    { t: 'On R2, add the mirror route back to R1\'s LAN',
+      do: [
+        'On <b>R2</b>, create an IPv6 route for <b>2001:db8:1::/64</b> via <b>2001:db8:12::1</b>.',
+      ],
+      done: 'Each router has a static route to the other\'s LAN.',
+      why: 'The both-directions rule does not change with the protocol version. Without the return route, packets arrive and replies vanish.' },
+
+    { t: 'Verify the IPv6 routing tables on both routers',
+      do: [
+        'Display the IPv6 routing table on <b>R1</b> and then on <b>R2</b>.',
+        'Identify the <b>C</b> (connected), <b>L</b> (local) and <b>S</b> (static) entries.',
+      ],
+      done: 'Each router shows its own connected prefixes plus one static route to the far LAN.',
+      why: 'Reading an IPv6 table fluently — and spotting a missing return route in it — is the practical half of the IPv6 chapters.' },
   ],
   steps: [
     { t: 'On R1: enable IPv6 routing (off by default!) and address the link.', c: ['enable', 'configure terminal', 'ipv6 unicast-routing', 'interface g0/1', 'ipv6 address 2001:db8:12::1/64', 'no shutdown'] },

@@ -28,14 +28,104 @@ L({
   },
   intro: `<b>The situation:</b> a small network you have never seen before — two routers, a switch, a PC and an IP phone — and no documentation.<br><b>Your goal:</b> learn what each box actually does, how its ports are named, and how to read the physical layer from the command line. You will set speed and duplex by hand, see what auto-negotiation reports, and control Power over Ethernet on the port feeding the phone. Everything here is Day 1 knowledge that the rest of the course quietly assumes.`,
   tasks: [
-    { t: 'Identify what kind of device you are logged into, and what it is connected to', why: 'show version tells you the platform and image; CDP tells you what is on the other end of each cable. Together they replace a missing diagram.' },
-    { t: 'Read the interface names carefully: FastEthernet, GigabitEthernet, and the slot/port numbering', why: 'Fa0/1 is 100 Mbps, Gi0/1 is 1 Gbps. The name tells you the speed of the hardware before you look at any counters.' },
-    { t: 'Describe the ports so the next engineer knows what is plugged in where', why: 'A description costs five seconds now and saves an hour later. It appears in show interfaces status and in the config.' },
-    { t: 'Hard-code speed and duplex on the PC port, then look at how the output changes', why: 'Manually set values print plain; negotiated values carry an "a-" prefix. Spotting the difference is how you catch a duplex mismatch.' },
-    { t: 'Return one port to automatic negotiation to see both styles side by side', why: 'Auto is the correct default on almost every modern link. Hard-coding one end only is a classic way to CREATE a duplex mismatch.' },
-    { t: 'Check which ports are supplying Power over Ethernet and how much', why: 'The phone gets its electricity from the switch. PoE budget is finite, and "why did the phone reboot" is often a power question, not a network one.' },
-    { t: 'Switch PoE off on a port that will never need it, then back on for the phone', why: 'Ports feeding ordinary PCs do not need to offer power. Turning it off on those ports keeps the budget for the devices that do.' },
-    { t: 'Look at the router end of the link and compare a router port with a switch port', why: 'Router interfaces are routed by default and start shut down; switch ports are layer 2 and start enabled. That one difference explains a lot of confusion.' },
+    { t: 'Work out what device you are logged into and what it is cabled to',
+      do: [
+        'On the <b>SW1</b> tab, enter privileged EXEC mode and turn off the pager with <code>terminal length 0</code>.',
+        'Display the version information and note the platform and the IOS image.',
+        'Display the CDP neighbours, both the summary and the detailed view.',
+      ],
+      done: 'You can name the platform, and list which neighbour is on which port.',
+      why: 'show version tells you what the box is; CDP tells you what is on the far end of each cable. Together they replace a missing diagram — the first two commands on an unfamiliar network.' },
+
+    { t: 'Read the port inventory and the interface naming scheme',
+      do: [
+        'Display the interface status summary on <b>SW1</b>.',
+        'Note which ports are <b>FastEthernet</b> (100 Mbps) and which are <b>GigabitEthernet</b> (1 Gbps).',
+        'Note that the numbering is slot/port — a fixed switch only ever has slot 0.',
+      ],
+      done: 'You can say what speed each port type runs at from its name alone.',
+      why: 'The name tells you the hardware capability before you look at a single counter, and the abbreviations you type (fa0/1, g0/1) only make sense once you know the full names.' },
+
+    { t: 'Label the three ports that are in use',
+      do: [
+        'In global configuration mode, set descriptions: <b>F0/1</b> = <b>PC1-DESK</b>, <b>F0/2</b> = <b>IP-PHONE-RECEPTION</b>, <b>G0/1</b> = <b>UPLINK-TO-R1</b>.',
+      ],
+      done: 'The three descriptions appear in the Name column of <code>show interfaces status</code>.',
+      why: 'A description costs five seconds now and saves an hour later. It shows in the status output and in the running configuration, where the next engineer will look.' },
+
+    { t: 'Hard-code speed and duplex on the PC port',
+      do: [
+        'Enter interface <b>F0/1</b> and set the speed to <b>100</b> and the duplex to <b>full</b>.',
+        'Then look at the status output and note how those values print.',
+      ],
+      done: 'Fa0/1 shows <code>100</code> and <code>full</code> with no prefix.',
+      why: 'Manually set values print plain; negotiated values carry an "a-" prefix. Spotting that difference is how you catch a duplex mismatch on someone else\'s network.' },
+
+    { t: 'Hard-code the gigabit uplink, then put the phone port back to auto',
+      do: [
+        'Enter interface <b>G0/1</b> and set speed <b>1000</b> and duplex <b>full</b>.',
+        'Enter interface <b>F0/2</b>, set speed <b>100</b> and duplex <b>full</b> first, then set both back to <b>auto</b>.',
+        'Compare all three ports in the status output.',
+      ],
+      done: 'G0/1 reads 1000/full, F0/1 reads 100/full, and F0/2 reads with the a- prefix.',
+      why: 'Auto is the right default on nearly every modern link. Hard-coding ONE end only is the classic way to create a duplex mismatch — a link that is up, slow, and full of late collisions.' },
+
+    { t: 'Read the physical detail of a single port',
+      do: [
+        'Display the full interface detail for <b>F0/1</b>.',
+        'Find the MAC address, the MTU, the bandwidth, the duplex and speed, and the error counters.',
+      ],
+      done: 'You can point at the input errors and collisions counters.',
+      why: 'Rising input errors or late collisions point straight at cabling or a duplex problem. This is the deepest of the three interface views.' },
+
+    { t: 'Check the Power over Ethernet budget',
+      do: [
+        'Return to privileged EXEC and display the inline power status.',
+        'Note which port is drawing power, how much, and what class the device claims.',
+      ],
+      done: 'The phone port shows as drawing power; the others show off.',
+      why: 'The phone gets its electricity from the switch. A switch has a total wattage budget, and "why did the phone reboot?" is very often a power question rather than a network one.' },
+
+    { t: 'Refuse power on the ports that will never need it',
+      do: [
+        'Set <b>F0/1</b> and <b>F0/3</b> to <b>power inline never</b>.',
+        'Display the power status again and check the Admin column.',
+      ],
+      done: 'Both ports read "never" in the admin column.',
+      why: 'Ports feeding ordinary PCs do not need to offer power. Refusing it there keeps the budget for the devices that actually draw it.' },
+
+    { t: 'Work through all three power settings on the phone port',
+      do: [
+        'On <b>F0/2</b>, set <b>power inline static</b> and look at the output.',
+        'Then remove the setting with the "no" form and look again.',
+        'Finish by setting <b>power inline auto</b>, which is what the phone needs.',
+        'Save the switch configuration.',
+      ],
+      done: 'F0/2 ends on auto and the configuration is saved.',
+      why: 'Static reserves the wattage whether or not a device is detected; the "no" form returns the port to its default; auto supplies power only when a powered device is found. Typing all three fixes the difference in memory.' },
+
+    { t: 'Compare a router with the switch you have just configured',
+      do: [
+        'Switch to the <b>R1</b> tab, enter privileged EXEC and turn off the pager.',
+        'Display the version information and the brief interface summary.',
+        'Note the two differences from the switch: every interface holds an IP address, and router ports start administratively down.',
+      ],
+      done: 'You can state both differences without looking.',
+      why: 'A router port is routed by default and ships disabled; a switch port is layer 2 and ships enabled. That single difference causes an enormous number of "why is it not working" moments.' },
+
+    { t: 'Confirm the cabling from the router\'s point of view',
+      do: [
+        'On <b>R1</b>, display the CDP neighbours and the detail for interface <b>G0/0</b>.',
+      ],
+      done: 'R1 lists SW1 and R2 as neighbours.',
+      why: 'The commands are identical on a router — bandwidth, duplex and speed are reported exactly as on the switch. Cross-checking the topology from two vantage points is a habit worth building.' },
+
+    { t: 'Finish at the simplest device of all',
+      do: [
+        'Switch to the <b>PC1</b> tab, run <code>ipconfig</code>, then ping its gateway <b>10.0.0.1</b>.',
+      ],
+      done: 'PC1 gets replies from the router.',
+      why: 'A host has one interface, one address and one gateway. Everything else in this course exists to carry that one packet.' },
   ],
   steps: [
     { d: 'SW1', t: 'Find out what this device is.', c: ['enable', 'terminal length 0', 'show version'], note: 'Platform, IOS image, uptime and how many interfaces of each type. The very first command to run on an unknown device.' },
@@ -96,12 +186,88 @@ L({
   },
   intro: `<b>The situation:</b> the OSI model is usually taught as seven words to memorise. Here you are going to <em>see</em> each layer instead, by running the command that exposes it on a real path from a PC to a server.<br><b>Your goal:</b> walk up the stack one layer at a time — cable, MAC address, IP address, port number — and watch the same packet be described differently at each step. Then walk it back down, which is exactly the method you will use to troubleshoot for the rest of your career.`,
   tasks: [
-    { t: 'LAYER 1 — Confirm the physical link is actually up on every hop', why: 'Layer 1 is "is there a signal". Nothing above it can work if this is wrong, which is why troubleshooting starts here.' },
-    { t: 'LAYER 2 — Find the MAC addresses in play and watch the switch learn them', why: 'Layer 2 moves frames inside one network using MAC addresses. The switch learns them by reading the source address of every frame it receives.' },
-    { t: 'LAYER 3 — Read the IP addresses and the routing table that connects the two networks', why: 'Layer 3 moves packets BETWEEN networks. The IP addresses stay the same end to end while the MAC addresses change at every hop.' },
-    { t: 'LAYER 4 — Look at how port numbers identify the application inside the packet', why: 'Layer 4 is how one host runs many conversations at once. An ACL that matches a port number is you reading layer 4 directly.' },
-    { t: 'Put it together: ping the server and trace the path hop by hop', why: 'One ping exercises all four layers at once. Traceroute shows you the layer-3 hops the packet actually took.' },
-    { t: 'Prove the bottom-up method: break layer 1, watch every layer above it fail, then fix it', why: 'A layer only works if everything below it works. Breaking one link deliberately makes that dependency impossible to forget.' },
+    { t: 'LAYER 1 — check that there is a signal on every hop',
+      do: [
+        'On the <b>SW1</b> tab, enter privileged EXEC and display the interface status.',
+        'Note which ports read <b>connected</b> and which read <b>notconnect</b>.',
+      ],
+      done: 'You can say which ports have something live on the far end.',
+      why: 'Layer 1 is simply "is there a signal". Nothing above it can work if this is wrong, which is why troubleshooting always starts here.' },
+
+    { t: 'Create some traffic so the layers above have something to work with',
+      do: [
+        'Switch to the <b>PC1</b> tab, run <code>ipconfig</code>, then ping its gateway <b>10.0.0.1</b>.',
+      ],
+      done: 'The ping succeeds.',
+      why: 'That single ping exercises the PC\'s IP address (layer 3), its MAC address (layer 2) and the cable (layer 1) all at once.' },
+
+    { t: 'LAYER 2 — see what MAC addresses the switch has learned',
+      do: [
+        'Back on <b>SW1</b>, display the MAC address table.',
+        'Then display the full detail of interface <b>F0/1</b> and find the burned-in MAC address.',
+      ],
+      done: 'You can match a table entry to the interface it was learned on.',
+      why: 'A switch reads the SOURCE MAC of every arriving frame and records it against the port. It never looks at an IP address — that is precisely what makes it a layer-2 device.' },
+
+    { t: 'LAYER 3 — read the addresses and the map between networks',
+      do: [
+        'Switch to the <b>R1</b> tab, enter privileged EXEC and turn off the pager.',
+        'Display the brief interface summary and the routing table.',
+        'Then display the ARP table.',
+      ],
+      done: 'You can name the two connected networks and find an ARP entry linking an IP to a MAC.',
+      why: 'The routing table is the layer-3 map. The ARP table is the bridge between layers 2 and 3 — "this IP address lives behind this MAC address" — and every layer-3 device keeps one.' },
+
+    { t: 'LAYER 4 — write a rule that reads port numbers',
+      do: [
+        'In configuration mode on <b>R1</b>, create a named extended access list called <b>LAYER4-DEMO</b>.',
+        'Permit <b>tcp any any eq 80</b>, then <b>tcp any any eq 443</b>, then <b>udp any any eq 53</b>, then <b>icmp any any</b>, and finally <b>deny ip any any</b>.',
+        'Display the access lists and read your five entries.',
+      ],
+      done: 'The list exists with port matches for 80, 443 and 53.',
+      why: 'Ports 80, 443 and 53 identify HTTP, HTTPS and DNS. The router can only read them because layer 4 sits inside the layer-3 packet — an extended ACL is layer-4 inspection.' },
+
+    { t: 'Apply the layer-4 rule and see all four layers judge one packet',
+      do: [
+        'Enter interface <b>G0/1</b> and apply <b>LAYER4-DEMO</b> in the <b>out</b> direction.',
+        'Confirm with the layer-3 interface view.',
+      ],
+      done: 'G0/1 reports the outgoing access list.',
+      why: 'The same packet is now judged on four layers at once: the port it arrived on, the MAC rewrite, the destination IP, and the TCP or UDP port inside.' },
+
+    { t: 'Send one packet through the whole stack',
+      do: [
+        'Switch to the <b>PC1</b> tab and ping <b>10.0.1.100</b> (the server).',
+        'Then trace the route to the same address.',
+      ],
+      done: 'The ping succeeds and the trace shows the router, then the server.',
+      why: 'Only two entries appear in the trace, because layer-2 switches are invisible to layer 3 — they never open the IP header at all.' },
+
+    { t: 'Look at the layer-2 half of that conversation',
+      do: [
+        'Still on <b>PC1</b>, run <code>arp -a</code>.',
+        'Check whether there is an entry for the server\'s address.',
+      ],
+      done: 'The cache holds the gateway, not the server.',
+      why: 'A host ARPs for its next hop, never for a destination in another network. If you remember one thing from the whole models chapter, make it this.' },
+
+    { t: 'Break layer 1 on purpose and watch everything above it fail',
+      do: [
+        'On <b>R1</b>, enter interface <b>G0/1</b> and disable it.',
+        'Display the brief interface summary and the routing table, and note that the connected route has vanished.',
+        'Then switch to <b>PC1</b> and ping <b>10.0.1.100</b> again — it should fail.',
+      ],
+      done: 'The route is gone and the ping fails.',
+      why: 'One layer-1 fault produces total failure at every layer above. That dependency is the entire argument for troubleshooting from the bottom up.' },
+
+    { t: 'Repair layer 1 and watch the stack come back',
+      do: [
+        'On <b>R1</b>, enable interface <b>G0/1</b> again.',
+        'Check the routing table — the connected route reappears instantly.',
+        'Ping once more from <b>PC1</b> to confirm.',
+      ],
+      done: 'The route is back and the ping succeeds.',
+      why: 'Layer 3 depends on layer 2 depends on layer 1, never the other way round. Fixed at the bottom, working at the top.' },
   ],
   steps: [
     { d: 'SW1', t: 'LAYER 1 — is there a signal on each port?', c: ['enable', 'terminal length 0', 'show interfaces status'], note: '"connected" means layer 1 and 2 are both fine. "notconnect" means nothing is detected on the wire — a cable, a dead far end, or a shut port at the other side.' },
@@ -158,13 +324,101 @@ L({
   layout: { PC1: [35, 60], R1: [145, 60], R2: [255, 60], PC2: [360, 60] },
   intro: `<b>The situation:</b> four blank interfaces and a handful of addresses that have to be typed exactly right.<br><b>Your goal:</b> get fluent with IPv4 addressing itself — the classes, the private ranges everyone uses, masks written both ways, and the two addresses in every subnet you are <em>not</em> allowed to give to a host. You will configure a 10-network, a 172.16 network, a 192.168 network and a /30 link, which between them cover every private range in the exam.`,
   tasks: [
-    { t: 'Address R1\'s LAN in the class B private range with a /24 mask', why: '172.16.0.0 to 172.31.255.255 is the class B private block. Using a /24 inside it is completely normal — the class no longer dictates the mask.' },
-    { t: 'Address the router-to-router link with a /30, the mask reserved for point-to-point links', why: 'A /30 gives exactly two usable addresses. On a link with exactly two devices, anything larger wastes addresses.' },
-    { t: 'Address R2\'s LAN in the class C private range', why: '192.168.0.0 to 192.168.255.255 is the class C private block — the one every home router uses.' },
-    { t: 'Create two loopbacks: one /32 identity address and one from the class A private range', why: 'A /32 is a single address and the convention for a router ID. Loopbacks never go down, which is exactly why they are used for identity.' },
-    { t: 'Read back the network address, broadcast address and usable range of each interface', why: 'The first address in a subnet is the network ID and the last is the broadcast — neither can be assigned to a host. Getting this wrong is the most common addressing error there is.' },
-    { t: 'Add the two routes that make the whole thing reachable, then test end to end', why: 'Addressing alone does not connect networks. Each router knows only its own connected subnets until you tell it otherwise.' },
-    { t: 'Deliberately configure a host address that is really a network address and see it rejected', why: 'IOS refuses to let you assign the network or broadcast address of a subnet. Meeting that error on purpose beats meeting it under pressure.' },
+    { t: 'On R1, address the class B private LAN with a /24',
+      do: [
+        'On the <b>R1</b> tab, enter configuration mode and set the hostname to <b>R1</b>.',
+        'Enter interface <b>G0/0</b>, describe it as <b>LAN-172</b>, give it <b>172.16.1.1</b> mask <b>255.255.255.0</b> and enable it.',
+      ],
+      done: 'G0/0 is up with 172.16.1.1/24.',
+      why: '172.16.0.0 to 172.31.255.255 is the class B private block. Using a /24 inside it is completely normal — the class stopped dictating the mask decades ago.' },
+
+    { t: 'Address the router-to-router link with a /30',
+      do: [
+        'Enter interface <b>G0/1</b>, describe it as <b>WAN-TO-R2</b>, and give it <b>10.0.12.1</b> mask <b>255.255.255.252</b>.',
+        'Enable it, then display the brief interface summary.',
+      ],
+      done: 'G0/1 is up with a /30 address.',
+      why: '255.255.255.252 is a /30: four addresses in total, two of them usable. On a link with exactly two routers, anything larger is wasted space.' },
+
+    { t: 'Create a /32 identity loopback and a class A private loopback',
+      do: [
+        'Create interface <b>Loopback 0</b> with <b>1.1.1.1</b> mask <b>255.255.255.255</b>.',
+        'Create interface <b>Loopback 1</b> with <b>10.255.255.1</b> mask <b>255.255.255.0</b>.',
+        'Check the interface summary — neither needed enabling.',
+      ],
+      done: 'Both loopbacks show as up/up.',
+      why: 'A /32 is a single host address and the convention for a router ID. 10.0.0.0/8 is the class A private range, the largest of the three. Loopbacks never go down because there is no cable to unplug.' },
+
+    { t: 'Read back the network and broadcast addresses IOS calculated',
+      do: [
+        'Leave configuration mode and display the layer-3 detail for <b>G0/0</b>, then for <b>G0/1</b>.',
+        'Find the broadcast address line in each and check it against your own arithmetic.',
+      ],
+      done: 'You can state the network address, broadcast address and usable range of both interfaces.',
+      why: 'IOS does the subnet arithmetic for you here, which makes it a free self-test every time you configure an interface.' },
+
+    { t: 'On R2, address the /30 link and the class C private LAN',
+      do: [
+        'Switch to the <b>R2</b> tab, enter configuration mode and set the hostname to <b>R2</b>.',
+        'On <b>G0/0</b>: description <b>WAN-TO-R1</b>, address <b>10.0.12.2</b> mask <b>255.255.255.252</b>, enabled.',
+        'On <b>G0/1</b>: description <b>LAN-192</b>, address <b>192.168.50.1</b> mask <b>255.255.255.0</b>, enabled.',
+      ],
+      done: 'Both R2 interfaces are up with the right addresses.',
+      why: '192.168.0.0 to 192.168.255.255 is the class C private block — the one every home router uses. Both ends of the /30 now sit in the same four-address subnet.' },
+
+    { t: 'Try to assign a network address and watch IOS refuse',
+      do: [
+        'On <b>R2</b>, enter interface <b>G0/1</b> and try to set the address to <b>192.168.50.0</b> with mask <b>255.255.255.0</b>.',
+        'Read the error. This failure is deliberate.',
+      ],
+      done: 'IOS rejects the address.',
+      why: '.0 with a /24 mask is the network ID, not a host address — and the same happens with .255, the broadcast. Meeting that error on purpose beats meeting it under exam pressure.' },
+
+    { t: 'Restore the correct gateway address',
+      do: [
+        'Set <b>G0/1</b> back to <b>192.168.50.1</b> mask <b>255.255.255.0</b> and confirm with the interface summary.',
+      ],
+      done: 'The interface holds the first usable address of the subnet.',
+      why: 'The first usable address is the conventional home for a gateway, and it is what the PCs in this lab are configured to use.' },
+
+    { t: 'Test the link before adding any routes',
+      do: [
+        'From <b>R1</b>, ping <b>10.0.12.2</b>.',
+      ],
+      done: 'The two routers reach each other.',
+      why: 'Directly connected networks need no routes at all. Proving the link works first means any later failure is a routing problem, not an addressing one.' },
+
+    { t: 'Add a route on R1 to the far LAN',
+      do: [
+        'On <b>R1</b>, create a static route for <b>192.168.50.0</b> mask <b>255.255.255.0</b> via <b>10.0.12.2</b>.',
+        'Display the routing table and read the codes column.',
+      ],
+      done: 'An S route to 192.168.50.0/24 appears.',
+      why: 'C is connected, L is the local /32 for the interface\'s own address, and S is your static route. Being able to read that column instantly is worth real marks.' },
+
+    { t: 'Add the matching return route on R2',
+      do: [
+        'On <b>R2</b>, create a static route for <b>172.16.1.0</b> mask <b>255.255.255.0</b> via <b>10.0.12.1</b>.',
+        'Display the routing table to confirm.',
+      ],
+      done: 'Each router has a route to the other\'s LAN.',
+      why: 'A ping needs a path there and a path back, and the two halves are configured separately on separate devices.' },
+
+    { t: 'Test end to end from both hosts',
+      do: [
+        'On the <b>PC1</b> tab, run <code>ipconfig</code>, ping <b>172.16.1.1</b>, then ping <b>192.168.50.10</b>.',
+        'On the <b>PC2</b> tab, ping <b>172.16.1.10</b>.',
+      ],
+      done: 'Both hosts reach each other across the /30.',
+      why: 'Three private ranges in one working network — exactly the mixture you meet in real companies that grew by acquisition.' },
+
+    { t: 'Prove the loopbacks are reachable, then save',
+      do: [
+        'From <b>R1</b>, ping <b>1.1.1.1</b> and <b>10.255.255.1</b>.',
+        'Save the configuration.',
+      ],
+      done: 'Both loopbacks answer and the configuration is saved.',
+      why: 'Loopbacks are always up, which is exactly why they are used as router IDs and management addresses — a physical port can fail, a loopback cannot.' },
   ],
   steps: [
     { d: 'R1', t: 'Name the router and address the class B private LAN.', c: ['enable', 'configure terminal', 'hostname R1', 'interface g0/0', 'description LAN-172', 'ip address 172.16.1.1 255.255.255.0', 'no shutdown', 'exit'], note: '172.16.1.1/24. The subnet runs 172.16.1.0 (network) to 172.16.1.255 (broadcast), so usable hosts are .1 to .254.' },
@@ -232,13 +486,87 @@ L({
   },
   intro: `<b>The situation:</b> a fully working network — two LANs, two routers, a switch and three hosts. Nothing is broken.<br><b>Your goal:</b> follow one packet from PC1 to the server and understand exactly what happens at every step. You will empty the ARP caches and the MAC table, send a single ping, and then look at what each device learned. This is the lab that makes "IP addresses stay the same, MAC addresses change at every hop" stop being a slogan and start being something you have watched happen.`,
   tasks: [
-    { t: 'Empty every cache first: the MAC address table on the switch and the ARP caches on both routers', why: 'Starting from empty means everything you see afterwards was learned by the traffic YOU sent. Otherwise you are reading someone else\'s history.' },
-    { t: 'Ping a host in the same subnet and work out who PC1 had to ARP for', why: 'Same subnet means no router is involved. PC1 ARPs for the destination itself and the switch learns two MAC addresses.' },
-    { t: 'Look at the switch\'s MAC table and match each entry to the port it was learned on', why: 'A switch learns from the SOURCE address of arriving frames. Two hosts talking means two entries, each on its own port.' },
-    { t: 'Now ping a host in a DIFFERENT subnet and check what PC1 ARPed for this time', why: 'This is the key moment: for a remote destination the host ARPs for its default gateway, never for the destination. The MAC is local; the IP is remote.' },
-    { t: 'Read the ARP cache on each router along the path', why: 'Each router repeats the same trick: it looks up the destination IP, finds the next hop, and ARPs for THAT. Three hops mean three separate ARP conversations.' },
-    { t: 'Trace the route and count the hops that actually appear', why: 'Only layer-3 devices decrement TTL and appear in a trace. The switch is invisible — which tells you something true about what switches do.' },
-    { t: 'Clear the ARP cache on a router and watch it repopulate on the next ping', why: 'ARP entries age out (four hours by default on IOS). Clearing and watching them return proves they are learned dynamically, not configured.' },
+    { t: 'Empty the switch\'s MAC address table',
+      do: [
+        'On the <b>SW1</b> tab, enter privileged EXEC and turn off the pager.',
+        'Clear the dynamically learned MAC addresses (the command needs the keyword <b>dynamic</b>).',
+        'Display the table and confirm it is empty.',
+      ],
+      done: 'The MAC table shows no dynamic entries.',
+      why: 'Starting from empty means everything you see afterwards was learned from traffic YOU sent — otherwise you are reading somebody else\'s history.' },
+
+    { t: 'Empty the ARP caches on both routers',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC and clear the ARP cache, then display it.',
+        'Do exactly the same on the <b>R2</b> tab.',
+      ],
+      done: 'Only each router\'s own interface addresses remain, marked with a dash for age.',
+      why: 'Those dashes mean the entry is local rather than learned. Everything that appears from here on is a direct result of your traffic.' },
+
+    { t: 'STEP 1 — ping inside the same subnet and see who gets ARPed for',
+      do: [
+        'Switch to the <b>PC1</b> tab, run <code>ipconfig</code>, then ping <b>10.0.1.20</b> (PC2, same subnet).',
+        'Then run <code>arp -a</code> on PC1 and look at what is cached.',
+      ],
+      done: 'The ping succeeds and PC1\'s ARP cache holds PC2\'s address.',
+      why: 'PC1 compares the destination with its own address and mask, decides it is local, and ARPs for PC2 directly. No router is involved at any point.' },
+
+    { t: 'See what the switch learned from that exchange',
+      do: [
+        'Back on <b>SW1</b>, display the MAC address table.',
+        'Match the two entries to the two ports.',
+      ],
+      done: 'Two entries appear, one on Fa0/1 and one on Fa0/2.',
+      why: 'The switch learned both addresses by reading the SOURCE address of arriving frames. From now on it forwards to one port instead of flooding.' },
+
+    { t: 'STEP 2 — ping a host in a DIFFERENT subnet',
+      do: [
+        'Still on <b>PC1</b>, ping <b>10.0.2.100</b> (the server, two routers away).',
+        'Then run <code>arp -a</code> again and look carefully at what is — and is not — in the cache.',
+      ],
+      done: 'The ping succeeds, but there is no ARP entry for 10.0.2.100.',
+      why: 'This is the key moment of the whole lab. The destination fails PC1\'s local test, so the frame is addressed to the GATEWAY while the packet inside still carries the server\'s IP. A host never ARPs for a remote address.' },
+
+    { t: 'Watch the first router repeat exactly the same logic',
+      do: [
+        'On <b>R1</b>, display the routing table, then the ARP table.',
+        'Note which address R1 has ARPed for.',
+      ],
+      done: 'R1 has an ARP entry for 10.0.12.2, the next hop — not for the server.',
+      why: 'R1 looks up the destination, finds the next hop, and ARPs for THAT. It then builds a brand-new frame with its own MAC as source and R2\'s as destination.' },
+
+    { t: 'Watch the last router do it once more',
+      do: [
+        'On <b>R2</b>, display the ARP table.',
+        'Note that this time R2 has ARPed for the server itself.',
+      ],
+      done: 'R2 holds an ARP entry for an address in 10.0.2.x.',
+      why: 'R2 is directly connected to the server\'s network, so on this final hop the destination IP and destination MAC finally belong to the same device again.' },
+
+    { t: 'Count the layer-3 hops on the path',
+      do: [
+        'On <b>PC1</b>, run <code>tracert 10.0.2.100</code>.',
+        'Count the entries and compare them with the diagram.',
+      ],
+      done: 'The trace shows R1, R2 and then the server — the switch never appears.',
+      why: 'Traceroute finds devices that decrement TTL. A layer-2 switch never opens the IP header, so it is invisible — which tells you something true about what switches actually do.' },
+
+    { t: 'Check the switch\'s view of that same conversation',
+      do: [
+        'On <b>SW1</b>, display the MAC address table again.',
+        'Notice that the switch learned R1\'s MAC on its uplink.',
+      ],
+      done: 'An entry for the uplink port is present.',
+      why: 'To SW1 that exchange was just another frame between two MAC addresses. It has no idea a server in another subnet was ever involved.' },
+
+    { t: 'Prove ARP entries are dynamic by clearing and rebuilding one',
+      do: [
+        'On <b>R1</b>, clear the ARP cache and display it — the learned entries are gone.',
+        'Switch to <b>PC1</b> and ping <b>10.0.2.100</b> again.',
+        'Return to <b>R1</b> and display the ARP table once more.',
+      ],
+      done: 'The learned entry reappears with no configuration from you.',
+      why: 'ARP is entirely automatic, with a four-hour age-out on IOS. It also explains why the very first ping of a session sometimes times out on real gear while the rest succeed.' },
   ],
   steps: [
     { d: 'SW1', t: 'Empty the switch\'s memory of who is where.', c: ['enable', 'terminal length 0', 'clear mac address-table dynamic', 'show mac address-table'], note: 'The table is now empty. Note the command needs the word "dynamic" — static entries are never cleared this way.' },
@@ -297,14 +625,97 @@ L({
   layout: { PC1: [30, 25], PC2: [30, 100], R1: [150, 62], R2: [265, 62], PC3: [370, 62] },
   intro: `<b>The situation:</b> your company owns exactly one address block — <b>192.168.10.0/24</b> — and you have four networks to build from it: an engineering LAN needing 60 hosts, a sales LAN needing 30, a small branch LAN needing 14, and a router-to-router link needing 2.<br><b>Your goal:</b> carve that single /24 into four right-sized subnets using VLSM, configure them, and prove the plan works. The arithmetic is the exam's single most-tested skill, and doing it on live interfaces beats doing it on paper because the router tells you when you are wrong.<br><br><b>The plan to implement:</b><br>• 60 hosts → <b>/26</b> (62 usable): 192.168.10.0/26, gateway .1<br>• 30 hosts → <b>/27</b> (30 usable): 192.168.10.64/27, gateway .65<br>• 14 hosts → <b>/28</b> (14 usable): 192.168.10.96/28, gateway .97<br>• 2 hosts → <b>/30</b> (2 usable): 192.168.10.112/30, addresses .113 and .114`,
   tasks: [
-    { t: 'Work out each subnet before typing anything: network address, mask, usable range, broadcast', why: 'VLSM means always allocating the largest block first. Do the arithmetic once, write it down, and the configuration becomes mechanical.' },
-    { t: 'Configure the /26 engineering LAN on R1 G0/0 with the first usable address as the gateway', why: '/26 is 255.255.255.192 — blocks of 64. The subnets are .0, .64, .128 and .192, and the usable hosts in the first are .1 to .62.' },
-    { t: 'Configure the /27 sales LAN on R1 G0/1', why: '/27 is 255.255.255.224 — blocks of 32. Starting at .64 the subnet runs to .95, with .65 to .94 usable.' },
-    { t: 'Configure the /30 point-to-point link between the two routers', why: '/30 is 255.255.255.252 — blocks of 4. Two usable addresses for two routers, and nothing wasted.' },
-    { t: 'Configure the /28 branch LAN on R2 G0/1', why: '/28 is 255.255.255.240 — blocks of 16. Starting at .96 it runs to .111, giving 14 usable addresses.' },
-    { t: 'Read show ip route and check every prefix length is what you intended', why: 'The routing table states each prefix length explicitly. It is the fastest way to catch a mask you fat-fingered.' },
-    { t: 'Prove the subnet boundaries are real: from the sales LAN, ping an address that belongs to a different subnet', why: 'Two hosts with different masks can appear to be "close" numerically and still be in separate networks. The mask, not the number, decides.' },
-    { t: 'Add routes between the two routers and test every host reaches every other host', why: 'Four subnets carved from one block still need routing between them. Subnetting divides; routing reconnects.' },
+    { t: 'Do the arithmetic before you touch a single interface',
+      do: [
+        'You have one block: <b>192.168.10.0/24</b>. Work out, on paper or in your head, the four subnets listed in the brief above.',
+        'For each one write down: network address, mask, first usable, last usable, broadcast.',
+        'VLSM rule: allocate the LARGEST requirement first, then the next largest.',
+      ],
+      done: 'You have four lines written down before you type anything.',
+      why: 'Doing the maths once, up front, turns the configuration into mechanical typing. Doing it as you go is how blocks end up overlapping.' },
+
+    { t: 'Configure the /26 engineering LAN on R1 G0/0',
+      do: [
+        'On the <b>R1</b> tab, enter configuration mode and set the hostname to <b>R1</b>.',
+        'Enter interface <b>G0/0</b>, describe it as <b>ENGINEERING-60-HOSTS</b>.',
+        'Give it <b>192.168.10.1</b> with mask <b>255.255.255.192</b> and enable it.',
+        'Display the layer-3 detail and check the broadcast address IOS reports.',
+      ],
+      done: 'G0/0 is up with a /26 address and the broadcast reads 192.168.10.63.',
+      why: '/26 is 255.255.255.192, so the blocks are 64 addresses wide: .0, .64, .128, .192. The first block runs .0 to .63, with .1 to .62 usable — 62 addresses for 60 hosts.' },
+
+    { t: 'Configure the /27 sales LAN on R1 G0/1',
+      do: [
+        'Enter interface <b>G0/1</b>, describe it as <b>SALES-30-HOSTS</b>.',
+        'Give it <b>192.168.10.65</b> with mask <b>255.255.255.224</b> and enable it.',
+      ],
+      done: 'G0/1 is up with a /27 address.',
+      why: '/27 is 255.255.255.224 — blocks of 32. Starting where the /26 ended, this subnet runs .64 to .95 with .65 to .94 usable: exactly 30 addresses for 30 hosts.' },
+
+    { t: 'Configure the /30 link between the two routers',
+      do: [
+        'Enter interface <b>G0/2</b>, describe it as <b>WAN-LINK-P2P</b>.',
+        'Give it <b>192.168.10.113</b> with mask <b>255.255.255.252</b> and enable it.',
+        'Then check the interface summary.',
+      ],
+      done: 'Three interfaces on R1 are up, each with a different prefix length.',
+      why: '/30 is blocks of 4: network .112, usable .113 and .114, broadcast .115. Four addresses consumed for a two-device link and nothing wasted.' },
+
+    { t: 'Configure R2 with the other half of the /30 and the /28 branch LAN',
+      do: [
+        'Switch to the <b>R2</b> tab, enter configuration mode and set the hostname to <b>R2</b>.',
+        'On <b>G0/0</b>: description <b>WAN-LINK-P2P</b>, address <b>192.168.10.114</b> mask <b>255.255.255.252</b>, enabled.',
+        'On <b>G0/1</b>: description <b>BRANCH-14-HOSTS</b>, address <b>192.168.10.97</b> mask <b>255.255.255.240</b>, enabled.',
+      ],
+      done: 'Both R2 interfaces are up.',
+      why: '/28 is 255.255.255.240 — blocks of 16. Network .96, broadcast .111, usable .97 to .110: 14 addresses for 14 hosts, a perfect fit.' },
+
+    { t: 'Test the link before touching routing',
+      do: [
+        'From <b>R1</b>, ping <b>192.168.10.114</b>.',
+      ],
+      done: 'The two routers reach each other across the /30.',
+      why: 'The foundation has to be sound before anything is built on it. Any later failure is now definitely a routing problem.' },
+
+    { t: 'Read your prefix lengths back out of the routing table',
+      do: [
+        'On <b>R1</b>, display the routing table.',
+        'Check that the three connected networks show as /26, /27 and /30 — exactly what you intended.',
+      ],
+      done: 'Three different prefix lengths appear, all carved from one /24.',
+      why: 'That is VLSM, and the routing table is your proof it worked. It is also the fastest way to catch a mask you fat-fingered.' },
+
+    { t: 'Route from R1 to the branch LAN',
+      do: [
+        'On <b>R1</b>, create a static route for <b>192.168.10.96</b> mask <b>255.255.255.240</b> via <b>192.168.10.114</b>.',
+      ],
+      done: 'An S route to the /28 appears in R1\'s table.',
+      why: 'Note the mask in the route matches the mask on the far interface. Writing /24 here would claim the whole block and break every other subnet.' },
+
+    { t: 'Add the two return routes on R2',
+      do: [
+        'On <b>R2</b>, create a route for <b>192.168.10.0</b> mask <b>255.255.255.192</b> via <b>192.168.10.113</b>.',
+        'Add a second route for <b>192.168.10.64</b> mask <b>255.255.255.224</b> via <b>192.168.10.113</b>.',
+      ],
+      done: 'R2 has two static routes with two different masks.',
+      why: 'Two separate routes, because the two LANs have different prefix lengths. They cannot be summarised into one without also covering the WAN link.' },
+
+    { t: 'Test from every host',
+      do: [
+        'On <b>PC1</b>: <code>ipconfig</code>, ping <b>192.168.10.1</b>, then ping <b>192.168.10.70</b>.',
+        'On <b>PC2</b>: ping <b>192.168.10.65</b>, then ping <b>192.168.10.100</b>.',
+        'On <b>PC3</b>: ping <b>192.168.10.97</b>, then <b>192.168.10.10</b>, then <b>192.168.10.70</b>.',
+      ],
+      done: 'Every host reaches its own gateway and both other LANs.',
+      why: 'PC1 is .10 in a /26 so its subnet ends at .63 — reaching .70 already needs the router. Numerically close, logically separate: that is what a mask does.' },
+
+    { t: 'Prove a broadcast address really is unusable',
+      do: [
+        'On <b>R1</b>, try to set interface <b>G0/0</b> to <b>192.168.10.63</b> with mask <b>255.255.255.192</b>.',
+        'Read the error, then put <b>192.168.10.1</b> back and save both routers.',
+      ],
+      done: 'IOS refuses .63 and the correct address is restored.',
+      why: '.63 is the broadcast address of that /26. If you are ever unsure whether an address is usable, the router will tell you — but it is faster to know the block size.' },
   ],
   steps: [
     { d: 'R1', t: 'Name the router, then build the /26 — the biggest block first.', c: ['enable', 'configure terminal', 'hostname R1', 'interface g0/0', 'description ENGINEERING-60-HOSTS', 'ip address 192.168.10.1 255.255.255.192', 'no shutdown', 'exit', 'do show ip interface g0/0'], note: '/26 = 255.255.255.192. Network 192.168.10.0, broadcast .63, usable .1 to .62 — 62 addresses for 60 hosts, with two spare.' },
@@ -359,14 +770,84 @@ L({
   layout: { SW1: [90, 35], SW2: [260, 35], SW3: [175, 120], PC1: [30, 120] },
   intro: `<b>The situation:</b> three switches wired in a triangle. Physically that is a loop, and an unmanaged loop at layer 2 will melt a network in seconds — broadcast storms, MAC table instability, duplicate frames.<br><b>Your goal:</b> run <b>Rapid PVST+</b> on all three, choose the root bridge deliberately rather than letting the switches pick, read the port roles the protocol assigns, and make the host-facing port come up instantly and safely. Classic STP takes 30-50 seconds to converge; RSTP does it in one or two, and the exam expects you to know exactly why.`,
   tasks: [
-    { t: 'Look at the spanning-tree state before changing anything and note which mode is running', why: 'Cisco switches default to PVST+ (the classic 802.1D behaviour, one instance per VLAN). Knowing the starting point makes the change visible.' },
-    { t: 'Switch all three switches to Rapid PVST+', why: 'RSTP (802.1w) converges in a second or two instead of 30-50. Every switch in the network must run it, because one classic switch drags its links back to the slow timers.' },
-    { t: 'Make SW1 the root bridge deliberately by lowering its priority', why: 'Left alone, the switch with the lowest MAC address wins — which is usually the oldest and slowest box in the building. Always place the root yourself.' },
-    { t: 'Set a second switch as the backup root with the next-lowest priority', why: 'If the root fails you want to know in advance which switch takes over, rather than discovering it during an outage.' },
-    { t: 'Read the port roles on each switch: root, designated, and the one that is blocking', why: 'Exactly one port per switch points at the root. Every segment has one designated port. The leftover port is blocked — that is the loop being broken in software.' },
-    { t: 'Turn the host-facing port into an edge port with portfast', why: 'An edge port skips the listening and learning states and comes up instantly, so a PC gets DHCP immediately instead of timing out during a 30-second wait.' },
-    { t: 'Protect that edge port with BPDU guard', why: 'A portfast port should never receive a BPDU — if it does, somebody plugged a switch into a desk port. BPDU guard shuts the port down rather than letting it reshape your topology.' },
-    { t: 'Drop back to classic PVST+ briefly to compare, then return to Rapid', why: 'Typing both commands and seeing both outputs fixes the difference in memory better than any table.' },
+    { t: 'Look at what spanning tree is doing before you change anything',
+      do: [
+        'On <b>SW1</b>, enter privileged EXEC, turn off the pager and set the hostname to <b>SW1</b>.',
+        'Display the spanning-tree status and note which bridge it calls the root.',
+        'Do the same on <b>SW2</b> and <b>SW3</b>, naming each of them as you go.',
+      ],
+      done: 'All three switches agree on which bridge is currently root.',
+      why: 'The switches have already blocked a port by themselves — the loop is handled out of the box. Your job is to control HOW it is handled, not whether.' },
+
+    { t: 'Put all three switches into Rapid PVST+',
+      do: [
+        'On <b>SW1</b>, set the spanning-tree mode to <b>rapid-pvst</b>.',
+        'Repeat on <b>SW2</b> and on <b>SW3</b>.',
+      ],
+      done: 'All three switches run the same mode.',
+      why: 'RSTP converges in a second or two instead of 30-50. One switch left on the classic mode drags its links back to the slow timers, so every switch needs the command.' },
+
+    { t: 'Make SW1 the root bridge deliberately',
+      do: [
+        'On <b>SW1</b>, set the spanning-tree priority for <b>VLAN 1</b> to <b>4096</b>.',
+        'Display the spanning-tree status and look for the line saying this bridge is the root.',
+      ],
+      done: 'SW1 reports itself as the root bridge.',
+      why: 'Left alone, the lowest MAC address wins — usually the oldest switch in the building. Priority must be a multiple of 4096 because the VLAN ID occupies the low bits of the bridge ID.' },
+
+    { t: 'Make SW2 the backup root',
+      do: [
+        'On <b>SW2</b>, set the spanning-tree priority for <b>VLAN 1</b> to <b>8192</b>.',
+      ],
+      done: 'SW2 reports priority 8192 for VLAN 1.',
+      why: '8192 beats the 32768 default but loses to SW1\'s 4096. If SW1 ever dies you know in advance exactly which switch takes over.' },
+
+    { t: 'Read the port roles on each switch',
+      do: [
+        'Display the spanning-tree status on <b>SW3</b>, then on <b>SW2</b>, then on <b>SW1</b>.',
+        'For each switch, identify the <b>root port</b>, the <b>designated ports</b>, and any port that is blocking.',
+      ],
+      done: 'You can name the role of every port in the triangle.',
+      why: 'Every non-root switch has exactly one root port; every segment has one designated port; whatever is left is blocked. That blocked port is the loop being broken in software, on a cable that is physically fine.' },
+
+    { t: 'Turn the host-facing port into an edge port',
+      do: [
+        'On <b>SW1</b>, enter interface <b>F0/1</b> and enable <b>portfast</b>.',
+        'Read the warning IOS prints as you type it.',
+      ],
+      done: 'Portfast appears under Fa0/1 in the running configuration.',
+      why: 'An edge port skips the listening and learning states and forwards immediately, so a PC gets DHCP at once. The warning is describing exactly the accident that the next task prevents.' },
+
+    { t: 'Protect that edge port with BPDU guard',
+      do: [
+        'Still inside <b>F0/1</b>, enable <b>BPDU guard</b>.',
+      ],
+      done: 'BPDU guard appears under Fa0/1.',
+      why: 'A portfast port should never receive a BPDU. If it does, somebody has plugged in a switch — BPDU guard err-disables the port instead of letting that device reshape your topology.' },
+
+    { t: 'Apply the same protection switch-wide on SW2',
+      do: [
+        'On <b>SW2</b>, enable <b>portfast default</b> and <b>portfast bpduguard default</b> in global configuration mode.',
+        'Check the running configuration afterwards.',
+      ],
+      done: 'Both global default commands are present on SW2.',
+      why: 'The "default" forms apply to every access port at once, which is how it is really done on a 48-port switch rather than interface by interface.' },
+
+    { t: 'Compare classic PVST+ with Rapid, then return to Rapid',
+      do: [
+        'On <b>SW3</b>, set the mode to <b>pvst</b> and display the spanning-tree status.',
+        'Then set it back to <b>rapid-pvst</b> and display the status again.',
+      ],
+      done: 'SW3 finishes on rapid-pvst.',
+      why: 'Classic 802.1D uses blocking, listening, learning and forwarding with 30-50 second convergence; RSTP uses discarding, learning and forwarding and converges in about a second. Typing both fixes the difference in memory.' },
+
+    { t: 'Confirm the host port works and save all three switches',
+      do: [
+        'On the <b>PC1</b> tab, run <code>ipconfig</code>.',
+        'Save the configuration on <b>SW1</b>, <b>SW2</b> and <b>SW3</b>.',
+      ],
+      done: 'All three switches are saved.',
+      why: 'With portfast the port forwards the instant it comes up, so a real PC gets its lease immediately instead of waiting out the STP timers.' },
   ],
   steps: [
     { d: 'SW1', t: 'Name the switch and see what spanning tree is doing already.', c: ['enable', 'terminal length 0', 'configure terminal', 'hostname SW1', 'end', 'show spanning-tree'], note: 'The switches have already blocked a port by themselves — the loop is handled out of the box. Your job is to control HOW, not whether.' },
@@ -440,14 +921,97 @@ L({
   },
   intro: `<b>The situation:</b> three routers in a triangle, every link addressed and up, and not one routing entry between them. There are two ways to fix that — type every route by hand, or let the routers tell each other. This lab does both, on the same network, so you can see exactly how a router chooses when it is offered the same destination twice.<br><b>Your goal:</b> understand <b>administrative distance</b> — the number that decides which source of routing information a router believes — and build a floating static route, the standard backup-path technique that depends entirely on it.`,
   tasks: [
-    { t: 'Start with a static route to R3\'s loopback and note the administrative distance it gets', why: 'A static route has AD 1: the router treats it as almost as trustworthy as a directly-connected interface.' },
-    { t: 'Now enable OSPF on all three routers so they learn the same destination dynamically', why: 'OSPF discovers neighbours and floods link information. Configure it once and every router learns every network — without you typing each route.' },
-    { t: 'Look at the routing table and work out which of the two sources won', why: 'The router does not compare metrics between protocols — it compares administrative distance first. Static (1) beats OSPF (110), so the hand-typed route wins even if it is the worse path.' },
-    { t: 'Remove the static route and watch the OSPF route appear in its place', why: 'The OSPF route was there all along, held in the topology database but not installed. Removing the better-trusted route promotes it instantly.' },
-    { t: 'Build a floating static route with a deliberately high administrative distance', why: 'AD 200 puts it below OSPF, so it sits unused while OSPF works and installs automatically the moment OSPF stops. That is the entire backup-link technique in one line.' },
-    { t: 'Break the OSPF path and confirm the floating static takes over', why: 'A backup you have never tested is not a backup. Bring the link down and watch the table change.' },
-    { t: 'Restore the link and confirm OSPF takes the traffic back', why: 'Failing over is half the job; failing back cleanly is the other half.' },
-    { t: 'Read show ip protocols and the codes at the top of show ip route', why: 'show ip protocols summarises every routing protocol running and what it advertises. The codes legend tells you where every route in the table came from.' },
+    { t: 'Start with what you already know — a static route',
+      do: [
+        'On <b>R1</b>, enter privileged EXEC, turn off the pager and go into configuration mode.',
+        'Create a static route for <b>3.3.3.3</b> mask <b>255.255.255.255</b> via <b>10.0.12.2</b>.',
+        'Display the routing table and read the two numbers in square brackets.',
+      ],
+      done: 'The route appears as S 3.3.3.3/32 [1/0] via 10.0.12.2.',
+      why: 'The first number is the administrative distance (1 for a static route) and the second is the metric. Note the path it chose: via R2, the long way round.' },
+
+    { t: 'Enable OSPF on R1',
+      do: [
+        'Still on <b>R1</b>, start OSPF process <b>1</b> and set the router ID to <b>1.1.1.1</b>.',
+        'Advertise <b>10.0.0.0</b> with wildcard <b>0.0.255.255</b> in area <b>0</b> — one statement covers every 10.0.x.x interface.',
+        'Advertise the loopback <b>1.1.1.1</b> with wildcard <b>0.0.0.0</b> in area 0.',
+      ],
+      done: 'The OSPF process exists with two network statements.',
+      why: 'A wildcard of 0.0.255.255 matches a whole /16 worth of interfaces at once; 0.0.0.0 matches exactly one address. Both forms turn up constantly in real configurations.' },
+
+    { t: 'Enable OSPF on R2 and R3 so the routers can talk',
+      do: [
+        'On <b>R2</b>: OSPF process <b>1</b>, router ID <b>2.2.2.2</b>, advertise <b>10.0.0.0 0.0.255.255</b> and <b>2.2.2.2 0.0.0.0</b>, both in area 0.',
+        'On <b>R3</b>: OSPF process <b>1</b>, router ID <b>3.3.3.3</b>, advertise <b>10.0.0.0 0.0.255.255</b> and <b>3.3.3.3 0.0.0.0</b>, both in area 0.',
+        'Check the neighbour table on each.',
+      ],
+      done: 'R3 shows two neighbours; R1 and R2 show their own.',
+      why: 'Adjacencies form within seconds once both ends are configured. From here on every router learns every network without anybody typing a route.' },
+
+    { t: 'Work out which source of information won for 3.3.3.3',
+      do: [
+        'On <b>R1</b>, display the routing table and look at the entry for <b>3.3.3.3</b>.',
+        'Note whether it is marked S or O, and which next hop it uses.',
+      ],
+      done: 'The entry is still the static route, via R2.',
+      why: 'The router compares administrative distance first, not metrics: static (1) beats OSPF (110), so your hand-typed route wins even though OSPF knows about the shorter direct link.' },
+
+    { t: 'Remove the static route and watch OSPF take over',
+      do: [
+        'On <b>R1</b>, delete the static route to <b>3.3.3.3 255.255.255.255</b> via <b>10.0.12.2</b>.',
+        'Display the routing table again.',
+      ],
+      done: 'The entry is now marked O, with a different next hop and a metric.',
+      why: 'The OSPF route existed all along, held in the database but not installed. Removing the better-trusted route promotes it instantly — and it happens to be the better path.' },
+
+    { t: 'Build a floating static route as a deliberate backup',
+      do: [
+        'On <b>R1</b>, create a static route for <b>3.3.3.3</b> mask <b>255.255.255.255</b> via <b>10.0.12.2</b> with a trailing administrative distance of <b>200</b>.',
+        'Display the routing table and note that it does NOT appear.',
+      ],
+      done: 'The route is configured but absent from the table.',
+      why: 'Because 200 is worse than OSPF\'s 110, the route sits in reserve. That single trailing number is the entire backup-link technique.' },
+
+    { t: 'Break the OSPF path and watch the backup activate',
+      do: [
+        'On <b>R1</b>, disable interface <b>G0/2</b> — the direct link to R3.',
+        'Display the routing table and the OSPF neighbour table.',
+        'Then ping <b>3.3.3.3</b>.',
+      ],
+      done: 'The floating static is now installed and the ping still succeeds.',
+      why: 'A backup you have never tested is not a backup. Traffic now takes the longer path via R2 and users notice nothing beyond a brief blip.' },
+
+    { t: 'Restore the link and confirm it fails back',
+      do: [
+        'Re-enable interface <b>G0/2</b> on <b>R1</b>.',
+        'Display the routing table again.',
+      ],
+      done: 'The O route returns and the AD-200 static drops back out of the table.',
+      why: 'Failing over is only half the job; failing back cleanly is the other half, and it happens automatically because the better AD wins the moment it reappears.' },
+
+    { t: 'Read the summary of every routing protocol running',
+      do: [
+        'On <b>R1</b>, display the IP protocols summary.',
+        'Note the protocol, the router ID, what it advertises, which interfaces are passive, and the administrative distance.',
+      ],
+      done: 'You can describe R1\'s routing configuration from that one screen.',
+      why: 'It is the first command to run on a router you have inherited, because it tells you what is running before you start reading configuration lines.' },
+
+    { t: 'See longest-prefix match beat administrative distance',
+      do: [
+        'On <b>R1</b>, add a static route for <b>3.3.3.0</b> mask <b>255.255.255.0</b> via <b>10.0.12.2</b>.',
+        'Display the routing table and decide which entry a packet to 3.3.3.3 would actually use.',
+      ],
+      done: 'Both routes are present and you can say which one wins.',
+      why: 'The /32 from OSPF is more specific than your /24 static, so it wins regardless of administrative distance. Prefix length is checked BEFORE AD — that order catches people out constantly.' },
+
+    { t: 'Test from the LAN and save all three routers',
+      do: [
+        'On the <b>PC1</b> tab, ping <b>3.3.3.3</b> and <b>2.2.2.2</b>.',
+        'Save the configuration on <b>R1</b>, <b>R2</b> and <b>R3</b>.',
+      ],
+      done: 'Both loopbacks answer from the LAN and all three routers are saved.',
+      why: 'A host reaching addresses three routers away, entirely by paths the routers worked out for themselves, is the whole argument for dynamic routing.' },
   ],
   steps: [
     { d: 'R1', t: 'Start with what you already know — a static route.', c: ['enable', 'terminal length 0', 'configure terminal', 'ip route 3.3.3.3 255.255.255.255 10.0.12.2', 'end', 'show ip route'], note: 'Look at the [1/0] beside the route: administrative distance 1, metric 0. Note the path — via R2, the long way round.' },
@@ -516,14 +1080,91 @@ L({
   },
   intro: `<b>The situation:</b> one PC, one router and one server that runs several services at once — a web site, a secure shell, a DNS resolver and a TFTP daemon. All of them share a single IP address.<br><b>Your goal:</b> understand how <b>port numbers</b> keep those conversations apart, learn the well-known numbers the exam expects on sight, and then read layer 4 directly by writing access lists that permit one service while denying another. This is the chapter that makes extended ACLs make sense.`,
   tasks: [
-    { t: 'Start by proving everything is reachable, so later failures are yours and deliberate', why: 'Baseline first. A filter you cannot prove changed something has taught you nothing.' },
-    { t: 'Write a list that permits web traffic to the server and denies everything else', why: 'Port 80 and 443 are HTTP and HTTPS. Matching them is you reading the TCP header — something a standard ACL cannot do at all.' },
-    { t: 'Test it: the web ports should work and SSH should not', why: 'One destination address, two different outcomes depending only on the port number. That is layer 4 doing its job.' },
-    { t: 'Rewrite the list to allow the secure management protocols as well', why: 'SSH is 22, and it is the one you always want to keep open to yourself. Adding a line to a named list is how a real change gets made.' },
-    { t: 'Add the common UDP services — DNS, TFTP, NTP and SNMP', why: 'UDP has no handshake and no retransmission. It is used where speed matters more than guaranteed delivery, and it has its own port numbers to memorise.' },
-    { t: 'Use a port range in a single line instead of many individual lines', why: 'The range keyword matches a block of ports in one entry — shorter lists are easier to read and easier to audit.' },
-    { t: 'Use the established keyword to allow replies back without opening the door', why: 'established matches TCP segments that are part of an existing conversation. It lets your users browse out while blocking anyone starting a session inward.' },
-    { t: 'Read the final list back and account for every line', why: 'An access list you cannot explain line by line is a list you cannot safely change.' },
+    { t: 'Establish that everything works before you filter anything',
+      do: [
+        'On the <b>PC1</b> tab, run <code>ipconfig</code>, then ping the server at <b>10.0.2.100</b>.',
+      ],
+      done: 'The ping succeeds.',
+      why: 'A filter you cannot prove changed something has taught you nothing. Baseline first, every time.' },
+
+    { t: 'Look at the two networks you are about to filter between',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC, turn off the pager and display the brief interface summary and the routing table.',
+      ],
+      done: 'You can name which interface faces the users and which faces the server.',
+      why: '10.0.1.0/24 holds the users and 10.0.2.0/24 the server. Everything below filters traffic travelling from the first into the second.' },
+
+    { t: 'Create a list that permits web traffic to the server',
+      do: [
+        'In configuration mode, create a named extended access list called <b>SERVICES</b>.',
+        'Permit <b>tcp</b> from <b>10.0.1.0 0.0.0.255</b> to <b>host 10.0.2.100</b> where the destination port equals <b>80</b>.',
+        'Add a second entry the same but for port <b>443</b>.',
+        'Display the access lists.',
+      ],
+      done: 'Two permit entries exist, for ports 80 and 443.',
+      why: 'Port 80 is HTTP and 443 is HTTPS. The implicit deny-everything at the end of every list blocks whatever you do not mention.' },
+
+    { t: 'Apply the list outbound towards the server LAN',
+      do: [
+        'Enter interface <b>G0/1</b> and apply <b>SERVICES</b> in the <b>out</b> direction.',
+        'Confirm with the layer-3 interface view.',
+      ],
+      done: 'G0/1 reports the outgoing access list SERVICES.',
+      why: 'Extended lists usually go close to the source, but placing this one outbound keeps a single list covering everything headed to this server — a deliberate trade-off worth understanding.' },
+
+    { t: 'Add the management protocols you cannot work without',
+      do: [
+        'Re-enter the <b>SERVICES</b> list and permit <b>tcp</b> from the same source to the same host on port <b>22</b>.',
+        'Also permit <b>icmp</b> from <b>10.0.1.0 0.0.0.255</b> to <b>host 10.0.2.100</b> — ICMP has no ports, so the entry ends at the destination.',
+      ],
+      done: 'The list now has four entries.',
+      why: 'Port 22 is SSH. Telnet (23) is deliberately absent because it sends everything, passwords included, in clear text. ICMP is permitted so ping remains usable for testing.' },
+
+    { t: 'Add the common UDP services',
+      do: [
+        'In the same list, permit <b>udp</b> from <b>10.0.1.0 0.0.0.255</b> to <b>host 10.0.2.100</b> on ports <b>53</b>, <b>69</b>, <b>123</b> and <b>161</b> — one entry each.',
+      ],
+      done: 'Four UDP entries appear in the list.',
+      why: 'DNS 53, TFTP 69, NTP 123 and SNMP 161 are the four UDP services worth knowing cold. UDP has no handshake and no retransmission — it is used where speed matters more than guaranteed delivery.' },
+
+    { t: 'Replace two lines with one port range',
+      do: [
+        'Add a <b>permit tcp</b> entry from the same source to the same host using <b>range 20 21</b> instead of an <code>eq</code>.',
+      ],
+      done: 'A range entry appears in the list.',
+      why: 'FTP uses two ports — 21 for commands and 20 for data. The range keyword takes both in a single line, and shorter lists are easier to read and to audit.' },
+
+    { t: 'Allow return traffic without opening anything inbound',
+      do: [
+        'Create a second named extended list called <b>RETURN-ONLY</b>.',
+        'Permit <b>tcp any</b> to <b>10.0.1.0 0.0.0.255</b> with the keyword <b>established</b> on the end.',
+        'Add <b>permit icmp any any</b> so your testing still works.',
+      ],
+      done: 'The RETURN-ONLY list exists with an established entry.',
+      why: 'The established keyword matches TCP segments carrying ACK or RST — that is, replies in a conversation the inside started. New inbound sessions have neither flag and are dropped.' },
+
+    { t: 'Apply the return filter towards the users',
+      do: [
+        'Enter interface <b>G0/0</b> and apply <b>RETURN-ONLY</b> in the <b>out</b> direction.',
+        'Confirm with the layer-3 interface view.',
+      ],
+      done: 'G0/0 reports the outgoing access list RETURN-ONLY.',
+      why: 'Traffic heading back to the users is now allowed only if it belongs to a session they started. That is a basic stateless firewall, built from one keyword.' },
+
+    { t: 'Test what your rules permit and forbid',
+      do: [
+        'On the <b>PC1</b> tab, ping <b>10.0.2.100</b> — it should still work, because you permitted ICMP.',
+      ],
+      done: 'The ping succeeds.',
+      why: 'Web, SSH, DNS, TFTP, NTP, SNMP, FTP and ICMP are permitted; everything else to that server is dropped by the implicit deny. Knowing which line each protocol hits is the skill being drilled.' },
+
+    { t: 'Read the finished list back, line by line',
+      do: [
+        'Display the access lists and the layer-3 detail of <b>G0/1</b>.',
+        'For each entry say out loud what it does, then save the configuration.',
+      ],
+      done: 'You can account for every line in both lists.',
+      why: 'An access list you cannot explain line by line is a list you cannot safely change — and changing somebody else\'s list is most of the work in a real job.' },
   ],
   steps: [
     { d: 'PC1', t: 'Baseline: everything currently works.', c: ['ipconfig', 'ping 10.0.2.100'], note: 'No filtering yet. Note the result so you can prove your rules did something.' },

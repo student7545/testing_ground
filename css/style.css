@@ -285,6 +285,23 @@ ol.tasks .tasktext { flex: 1; }
   margin: 6px 0 2px; border-left: 3px solid var(--border);
   padding: 4px 10px; font-size: 13px; color: var(--text-dim);
 }
+ol.tasks .taskdo { margin: 6px 0 4px; padding-left: 18px; list-style: none; }
+ol.tasks .taskdo > li {
+  position: relative; margin: 4px 0; font-size: 13.5px; line-height: 1.55;
+}
+ol.tasks .taskdo > li::before {
+  content: '\2013'; position: absolute; left: -14px; color: var(--text-dim);
+}
+.taskdone {
+  margin: 6px 0 2px; padding: 5px 10px; font-size: 12.5px; line-height: 1.5;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text-dim);
+}
+.taskdone .donelabel {
+  display: inline-block; margin-right: 7px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--accent);
+}
 
 .stepdev {
   display: inline-block; margin-right: 7px;
