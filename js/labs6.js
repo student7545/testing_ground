@@ -33,14 +33,111 @@ L({
   },
   intro: `<b>The situation:</b> nobody wants to remember that the file server is 10.0.2.100. DNS turns names into addresses, and Cisco devices both <em>use</em> it and can <em>provide</em> a small amount of it.<br><b>Your goal:</b> build name resolution three ways — a static host table typed into a router, a router acting as the resolver for the network, and a PC pointed at that resolver — then prove each one by pinging a name instead of an address. You will also meet <code>no ip domain-lookup</code> properly: the command every engineer types on day one, and now you will know exactly what it switches off.`,
   tasks: [
-    { t: 'Ping a name before configuring anything, and read the error carefully', why: 'The "Translating..." line tells you the device tried to resolve the name and had nowhere to ask. Recognising that message saves a lot of confusion.' },
-    { t: 'Create static name-to-address entries on R2 with ip host', why: 'A static host table needs no server at all. It is ideal for a handful of devices you type the names of constantly.' },
-    { t: 'Ping by name from R2 and confirm it resolves from that local table', why: 'The local table is checked first, before any name server. Proving that order matters when a name resolves "wrongly" in the real world.' },
-    { t: 'Turn R1 into the site resolver by giving it the zone entries for every device', why: 'One device holding the names means one place to update. In this lab R1 plays the part a real DNS server would.' },
-    { t: 'Point R2 at that resolver with ip name-server and make sure lookups are enabled', why: 'A name server is only ever consulted while ip domain-lookup is on — which is exactly why disabling lookups stops typo-induced hangs.' },
-    { t: 'Set a default domain name and resolve a short name that relies on it', why: 'With a domain name configured, "srv" is automatically tried as "srv.netdrill.lab". That is how short names work inside a company.' },
-    { t: 'Resolve a name from the PC, which uses the DNS server it was given', why: 'Hosts do the same thing routers do. nslookup asks the question directly and shows which server answered.' },
-    { t: 'Finally disable lookups on one router and watch a typo fail instantly instead of hanging', why: 'On real hardware a mistyped command with lookups enabled freezes the session for a minute or more. This is the reason for the habit.' },
+    { t: 'Try a name before anything is configured, and read the error',
+      do: [
+        'On the <b>R2</b> tab, enter privileged EXEC and turn off the pager.',
+        'Ping the name <b>srv</b> (a name, not an address).',
+        'Read the "Translating..." line carefully. This failure is deliberate.',
+      ],
+      done: 'R2 reports that it cannot resolve the name.',
+      why: 'That line tells you the device tried to resolve the name and had nowhere to ask. Recognising it instantly separates a DNS problem from a network problem.' },
+
+    { t: 'Build a small static host table on R2',
+      do: [
+        'Enter global configuration mode.',
+        'Create host entries: <b>srv</b> = <b>10.0.2.100</b>, <b>r1</b> = <b>10.0.12.1</b>, <b>pc1</b> = <b>10.0.1.10</b>.',
+        'Display the host table.',
+      ],
+      done: 'Three entries are listed, flagged as permanent.',
+      why: 'A static host table needs no server at all and survives DNS being down. It is ideal for the handful of devices whose names you type constantly.' },
+
+    { t: 'Ping by name using the local table',
+      do: [
+        'Still on <b>R2</b>, ping <b>srv</b>, then ping <b>r1</b>.',
+      ],
+      done: 'Both names resolve and answer immediately.',
+      why: 'The local table is checked before any DNS server, so static entries always win. Knowing that order matters the day a name resolves to the wrong address.' },
+
+    { t: 'Remove one entry with the "no" form',
+      do: [
+        'Delete the host entry for <b>pc1</b>.',
+        'Display the host table and confirm it is gone.',
+      ],
+      done: 'Only two static entries remain.',
+      why: 'Useful when a device moves and the stale entry would send you somewhere wrong — a stale static entry is worse than none at all.' },
+
+    { t: 'Turn R1 into the site resolver',
+      do: [
+        'Switch to the <b>R1</b> tab, enter privileged EXEC, turn off the pager and go into configuration mode.',
+        'Create host entries: <b>srv</b> = <b>10.0.2.100</b>, <b>srv.netdrill.lab</b> = <b>10.0.2.100</b>, <b>r2</b> = <b>10.0.12.2</b>, <b>pc1</b> = <b>10.0.1.10</b>.',
+        'Display the host table.',
+      ],
+      done: 'R1 holds four entries, including both forms of the server name.',
+      why: 'R1 is now playing the part a real DNS server would. Holding both the short and fully-qualified names means either form resolves.' },
+
+    { t: 'Point R2 at that resolver',
+      do: [
+        'Back on <b>R2</b>, configure the name server <b>10.0.0.1</b>.',
+        'Make sure domain lookup is <b>enabled</b>.',
+        'Set the default domain name to <b>netdrill.lab</b>.',
+      ],
+      done: '<code>show hosts</code> on R2 lists the name server and the domain.',
+      why: 'Three settings that work as one: WHERE to ask, WHETHER to ask, and what suffix to append to short names. Miss any one and resolution fails in a different way.' },
+
+    { t: 'Resolve a name R2 does not know locally',
+      do: [
+        'On <b>R2</b>, delete the local host entry for <b>srv</b> so the static table cannot answer.',
+        'Ping <b>srv</b> again and watch the Translating line — it now names the server that answered.',
+      ],
+      done: 'The name resolves through 10.0.0.1 and the ping succeeds.',
+      why: 'This proves the lookup order: local table first, then the configured name server. It is the same order a host uses with its hosts file.' },
+
+    { t: 'Resolve the fully-qualified form as well',
+      do: [
+        'On <b>R2</b>, ping <b>srv.netdrill.lab</b>.',
+      ],
+      done: 'The long form resolves to the same address.',
+      why: 'The domain suffix works in both directions: short names get it appended, and fully-qualified names resolve directly without it.' },
+
+    { t: 'Check what the host was given',
+      do: [
+        'Switch to the <b>PC1</b> tab and run <code>ipconfig /all</code>.',
+        'Find the DNS Servers line.',
+      ],
+      done: 'PC1 shows a DNS server address.',
+      why: 'A host with no DNS server reaches everything by address and nothing by name — a symptom worth recognising before you start blaming the network.' },
+
+    { t: 'Query the resolver directly from the host',
+      do: [
+        'On <b>PC1</b>, run <code>nslookup srv</code>.',
+        'Note which server answered and what address it returned.',
+      ],
+      done: 'nslookup returns 10.0.2.100.',
+      why: 'nslookup is the first tool to reach for when a name resolves to the WRONG address, because it shows you which server gave the answer.' },
+
+    { t: 'Use the name for real',
+      do: [
+        'On <b>PC1</b>, ping <b>srv</b>, then run <code>tracert srv</code>.',
+      ],
+      done: 'Both work using the name rather than the address.',
+      why: 'The name is resolved once and everything afterwards uses the address — exactly as the router did. DNS is a lookup step, not a transport.' },
+
+    { t: 'Switch lookups off and see the difference',
+      do: [
+        'On <b>R2</b>, disable domain lookup.',
+        'Ping <b>srv</b> again. It should fail immediately rather than resolve.',
+      ],
+      done: 'The name no longer resolves even though the server is still configured.',
+      why: 'The name server is still there; R2 simply stops asking. This is also why a mistyped command then fails instantly instead of freezing your session for a minute.' },
+
+    { t: 'Restore lookups, tidy a stale server entry, and save',
+      do: [
+        'On <b>R2</b>, add a second name server <b>8.8.8.8</b>, look at the host table, then remove it again.',
+        'Re-enable domain lookup, ping <b>srv</b> to confirm, and save.',
+        'Save <b>R1</b> as well.',
+      ],
+      done: 'Name resolution works again and both routers are saved.',
+      why: 'Adding and removing a server shows both directions of the command. In production most engineers leave lookups OFF on network devices and work with addresses — the typo tax is not worth it.' },
   ],
   steps: [
     { d: 'R2', t: 'Try a name before anything is configured.', c: ['enable', 'terminal length 0', 'ping srv'], expectErr: true, note: 'It tries to translate the name, has no server to ask, and gives up. That "Translating..." line is the fingerprint of a name-resolution problem.' },
@@ -110,14 +207,95 @@ L({
   },
   intro: `<b>The situation:</b> a monitoring station (the NMS) sits on the LAN and can see nothing. You have three devices that should be reporting their interface counters, CPU load and — more importantly — telling somebody when a link goes down at three in the morning.<br><b>Your goal:</b> configure SNMP on all three devices: read-only access for the monitoring system, the identity fields that make an alert readable, and a trap receiver so the devices report problems rather than waiting to be asked. You will also meet the read-write community, and understand why nobody sensible leaves one configured.`,
   tasks: [
-    { t: 'Check the SNMP state before configuring anything', why: 'An unconfigured device has no communities and answers nobody. Seeing the empty output first makes the change obvious.' },
-    { t: 'Configure a read-only community string on R1', why: 'The community string is SNMPv1/v2c\'s only authentication — effectively a password sent in clear text. Read-only means the NMS can ask questions but change nothing.' },
-    { t: 'Set the location and contact fields so alerts identify themselves', why: 'sysLocation and sysContact appear in every alert the NMS raises. "Rack 4, Comms Room B" beats a bare IP address at 3am.' },
-    { t: 'Point the device at the monitoring station as a trap receiver, using version 2c', why: 'Polling asks "are you all right?" every few minutes. A trap is the device shouting "I am not!" the instant something breaks — far better for outages.' },
-    { t: 'Enable traps so the device actually sends them', why: 'Naming a receiver is not enough: the device must also be told to generate the notifications.' },
-    { t: 'Repeat the whole configuration on the switch and the second router', why: 'Three devices reporting to one station is the minimum useful deployment, and the commands are identical on switches and routers.' },
-    { t: 'Add a read-write community, look at it, and then delete it again', why: 'Read-write allows SNMP SET — configuration changes over a clear-text protocol. Seeing it once and removing it is exactly the right relationship to have with this command.' },
-    { t: 'Verify with show snmp, show snmp community and show snmp host on every device', why: 'Three views: general statistics, who may ask, and who gets told. Between them they answer every SNMP question in the exam.' },
+    { t: 'Look at the SNMP state before configuring anything',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC, turn off the pager and display the SNMP status.',
+      ],
+      done: 'No communities are configured and the agent answers nobody.',
+      why: 'SNMP is not dangerous by default — it becomes dangerous the moment somebody configures it carelessly. Seeing the empty state makes each addition obvious.' },
+
+    { t: 'Add a read-only community for the monitoring station',
+      do: [
+        'In global configuration mode, create a community string <b>NetDrillRO</b> with <b>ro</b> (read-only) access.',
+        'Display the community list.',
+      ],
+      done: 'The community appears with access-type ro.',
+      why: 'The community string is SNMPv1 and v2c\'s only authentication — effectively a password sent in clear text. Treat it as one: never "public", never a word from your company name.' },
+
+    { t: 'Give the device an identity that will appear in alerts',
+      do: [
+        'Set the SNMP location to <b>Rack4-CommsRoomB</b>.',
+        'Set the SNMP contact to <b>netops@netdrill.lab</b>.',
+        'Display the SNMP status and find both fields.',
+      ],
+      done: 'Location and contact are shown in the output.',
+      why: 'These two fields are what turn "10.0.0.1 is down" at 3am into something an engineer can act on without hunting for a diagram.' },
+
+    { t: 'Send traps to the monitoring station',
+      do: [
+        'Configure a trap receiver at <b>10.0.0.200</b> using <b>version 2c</b> and community <b>NetDrillRO</b>.',
+        'Then enable trap generation.',
+        'Check both the host list and the SNMP status.',
+      ],
+      done: 'The trap receiver is listed and logging reports as enabled.',
+      why: 'Two separate commands are needed: WHERE to send notifications, and permission to generate them at all. Polling uses UDP 161; traps arrive on UDP 162.' },
+
+    { t: 'Repeat the whole configuration on the switch',
+      do: [
+        'Switch to the <b>SW1</b> tab, enter privileged EXEC and configuration mode.',
+        'Configure the same community, location, contact, trap receiver and trap enable.',
+      ],
+      done: 'SW1 reports the same SNMP settings as R1.',
+      why: 'Nothing about SNMP is router-specific. Typing the block a second time is also the repetition that makes it automatic.' },
+
+    { t: 'Repeat it on the remote router',
+      do: [
+        'Switch to the <b>R2</b> tab and configure the same community, contact, trap receiver and trap enable.',
+        'Set its location to <b>BranchOffice-Cabinet1</b> instead.',
+      ],
+      done: 'All three devices report to the same station.',
+      why: 'Different location string, same everything else. Three devices reporting to one monitoring station is the minimum realistic deployment.' },
+
+    { t: 'Try the version 3 form of the trap receiver, then go back to 2c',
+      do: [
+        'On <b>R1</b>, configure a trap receiver at <b>10.0.0.200</b> using <b>version 3</b> and user <b>netops</b>, and look at the host list.',
+        'Remove that receiver with the "no" form.',
+        'Re-add the <b>version 2c</b> receiver with community <b>NetDrillRO</b>.',
+      ],
+      done: 'The host list ends with a single version 2c entry.',
+      why: 'Version 3 replaces the community string with a named user carrying authentication and encryption. It is what you should deploy; v2c is what you will meet most often.' },
+
+    { t: 'Prove which command controls trap generation',
+      do: [
+        'On <b>R1</b>, disable traps and display the SNMP status.',
+        'Then enable them again and look once more.',
+      ],
+      done: 'The SNMP logging line changes between disabled and enabled.',
+      why: 'With traps disabled the device still answers polls but reports nothing on its own. Naming a receiver and enabling traps are two separate switches, and you need both.' },
+
+    { t: 'Add a read-write community, look at it, then delete it',
+      do: [
+        'On <b>R1</b>, create a community <b>NetDrillRW</b> with <b>rw</b> access and display the community list.',
+        'Then remove it and display the list again.',
+      ],
+      done: 'No read-write community remains.',
+      why: 'Read-write allows SNMP SET — remote configuration changes authenticated by a clear-text string. Seeing it once and removing it is exactly the right relationship to have with this command.' },
+
+    { t: 'Confirm every device can actually reach the monitoring station',
+      do: [
+        'Ping <b>10.0.0.200</b> from <b>R1</b>, from <b>SW1</b> and from <b>R2</b>.',
+      ],
+      done: 'All three get replies.',
+      why: 'A trap receiver you cannot reach is a trap receiver that never hears anything. Test the path, not just the configuration.' },
+
+    { t: 'Generate something worth trapping, then verify and save',
+      do: [
+        'On <b>R1</b>, bounce interface <b>G0/1</b> — disable it and enable it again.',
+        'Run the three verification commands: SNMP status, community list and host list.',
+        'Save <b>R1</b>, <b>SW1</b> and <b>R2</b>.',
+      ],
+      done: 'All three devices are saved and the bounced interface is back up.',
+      why: 'A link going down is the classic trap. On real gear the monitoring station would raise an alert within a second of that message.' },
   ],
   steps: [
     { d: 'R1', t: 'Look at SNMP before you touch it.', c: ['enable', 'terminal length 0', 'show snmp'], note: 'No communities configured, so the agent answers nobody. SNMP is not dangerous by default — it is dangerous once somebody configures it carelessly.' },
@@ -188,14 +366,105 @@ L({
   },
   intro: `<b>The situation:</b> three devices, no backups, and an IOS image sitting in flash that nobody has ever copied anywhere. When a switch dies you want to unbox the replacement, restore a config and go home — not rebuild it from memory.<br><b>Your goal:</b> learn the file-transfer commands properly. These are <b>interactive</b> commands: IOS asks you questions and you answer them line by line, which is exactly how it behaves on real hardware. You will back up configs to a TFTP server, restore one, copy an IOS image off the device, and configure FTP credentials for when TFTP is not enough.`,
   tasks: [
-    { t: 'Look at what is in flash before copying anything anywhere', why: 'show flash tells you the IOS image name and how much space is left — the two facts every upgrade depends on.' },
-    { t: 'Back up R1\'s running configuration to the TFTP server, answering each prompt', why: 'copy is interactive: it asks for the server address and the destination filename. Getting used to the question-and-answer rhythm is the whole skill.' },
-    { t: 'Back up the switch configuration too, using a filename you will recognise later', why: 'Default filenames are based on the hostname. In a real backup directory, a consistent naming scheme is what makes a restore quick.' },
-    { t: 'Try a backup to an address that is not reachable and read the failure', why: 'A timed-out copy usually means routing or a firewall, not a broken command. Recognising the error saves you re-typing a command that was fine.' },
-    { t: 'Restore a configuration from the server into the startup config', why: 'Copying to startup-config replaces the saved config without disturbing the running one until reload — the safe direction for a restore.' },
-    { t: 'Copy the IOS image out of flash to the server', why: 'Before any upgrade, take a copy of the working image. Being able to put the old one back is what makes an upgrade reversible.' },
-    { t: 'Configure FTP credentials and back up over FTP instead', why: 'TFTP has no authentication and no encryption and struggles with large files. FTP at least authenticates, and is the usual alternative on IOS.' },
-    { t: 'Verify the transfers and save every device', why: 'A backup you have not verified is a hope, not a backup.' },
+    { t: 'See what is stored on the device',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC, turn off the pager and list the contents of flash.',
+        'Note the exact IOS image filename and how much space is free.',
+      ],
+      done: 'You can read the image filename off the screen.',
+      why: 'That filename is what you type during an upgrade, and the free space decides whether a new image will even fit. Both facts come from this one command.' },
+
+    { t: 'Confirm the server is reachable before attempting a transfer',
+      do: [
+        'From <b>R1</b>, ping the TFTP server at <b>10.0.0.100</b>.',
+      ],
+      done: 'The server answers.',
+      why: 'Nearly every failed copy in the field is a reachability problem, not a syntax problem. TFTP uses UDP 69; FTP uses TCP 20 and 21.' },
+
+    { t: 'Back up the running configuration — and answer the prompts',
+      do: [
+        'Start a copy from <b>running-config</b> to <b>tftp:</b>.',
+        'IOS then asks two questions, one line at a time: answer the address prompt with <b>10.0.0.100</b>, then the filename prompt with <b>R1-backup.cfg</b>.',
+        'Watch for the exclamation marks and the byte count.',
+      ],
+      done: 'The transfer reports the number of bytes copied.',
+      why: 'copy is an interactive command: it asks for whatever it still needs. Anything shown in square brackets is the default, accepted by pressing Enter alone.' },
+
+    { t: 'Back up the switch the same way',
+      do: [
+        'Switch to the <b>SW1</b> tab, enter privileged EXEC and turn off the pager.',
+        'Copy <b>running-config</b> to <b>tftp:</b>, answering <b>10.0.0.100</b> and <b>SW1-backup.cfg</b>.',
+      ],
+      done: 'The switch reports a successful copy.',
+      why: 'Identical command on a switch. In a real backup directory the filename would carry the hostname and the date, which is what makes a restore quick.' },
+
+    { t: 'Back up the branch router across the WAN link',
+      do: [
+        'Switch to the <b>R2</b> tab and copy <b>running-config</b> to <b>tftp:</b>, answering <b>10.0.0.100</b> and <b>R2-backup.cfg</b>.',
+      ],
+      done: 'Three devices are now backed up.',
+      why: 'This transfer crosses a routed link, so it quietly tests your routing at the same time.' },
+
+    { t: 'Try a server that does not exist and read the failure',
+      do: [
+        'On <b>R1</b>, copy <b>running-config</b> to <b>tftp:</b> but answer the address prompt with <b>10.0.9.99</b> and the filename with <b>doomed.cfg</b>.',
+        'Expect a timeout. This failure is deliberate.',
+      ],
+      done: 'IOS reports an error opening the destination.',
+      why: 'The command was correct; the path was not. Recognising a timed-out copy as a routing or firewall issue saves you re-typing a command that was fine.' },
+
+    { t: 'Restore a configuration into NVRAM',
+      do: [
+        'On <b>R1</b>, copy from <b>tftp:</b> to <b>startup-config</b>.',
+        'Answer three prompts: server <b>10.0.0.100</b>, source filename <b>R1-backup.cfg</b>, and press Enter to accept the default destination.',
+        'Then display the startup configuration.',
+      ],
+      done: 'The startup configuration holds the file you pulled back.',
+      why: 'Restoring into startup-config is the safe direction: nothing changes on the running device until it reloads. Restoring into running-config merges instead of replacing, which is the trap.' },
+
+    { t: 'Archive the IOS image before any upgrade',
+      do: [
+        'On <b>R1</b>, copy from <b>flash:</b> to <b>tftp:</b>.',
+        'Answer the source filename prompt with the image name you read in the first task, then <b>10.0.0.100</b>, then <b>ios-backup.bin</b>.',
+      ],
+      done: 'A long row of exclamation marks and a byte count appear.',
+      why: 'Being able to put the old image back is what makes an upgrade reversible. Note the prompt order differs here — source first, then the server.' },
+
+    { t: 'Work through the remaining copy directions',
+      do: [
+        'Copy <b>startup-config</b> to <b>tftp:</b> as <b>R1-startup.cfg</b>.',
+        'Copy from <b>tftp:</b> into <b>running-config</b> using <b>R1-backup.cfg</b>.',
+        'Copy <b>startup-config</b> into <b>running-config</b>.',
+      ],
+      done: 'All three complete without error.',
+      why: 'Four directions in total: RAM out, NVRAM out, server into RAM, NVRAM into RAM. The one to be careful with is a restore into running-config, because it merges rather than replaces.' },
+
+    { t: 'Move an image both ways between flash and the servers',
+      do: [
+        'Copy from <b>tftp:</b> to <b>flash:</b>, pulling back <b>ios-backup.bin</b> and saving it as <b>ios-restored.bin</b>.',
+        'Copy from <b>flash:</b> to <b>ftp:</b>, sending <b>ios-restored.bin</b> as <b>ios-via-ftp.bin</b>.',
+        'Copy from <b>ftp:</b> to <b>flash:</b>, pulling that file back as <b>ios-from-ftp.bin</b>.',
+        'List flash to see what landed.',
+      ],
+      done: 'The new files appear in the flash listing.',
+      why: 'Downloading an image into flash is the first half of every IOS upgrade; the second half is pointing the boot system statement at it and reloading.' },
+
+    { t: 'Configure FTP credentials and back up over FTP',
+      do: [
+        'In configuration mode on <b>R1</b>, set an FTP username — type a wrong one first, remove it with the "no" form, then set <b>backupadmin</b>.',
+        'Set the FTP password to <b>B4ckupPass</b>.',
+        'Then copy <b>running-config</b> to <b>ftp:</b>, answering <b>10.0.0.100</b> and <b>R1-over-ftp.cfg</b>.',
+      ],
+      done: 'The FTP transfer completes and the credentials are in the configuration.',
+      why: 'FTP authenticates and handles large files far better than TFTP. Note the password is stored in the configuration, which is one reason SCP is preferred in high-security environments.' },
+
+    { t: 'Look at what else lives in a switch\'s flash, then save everything',
+      do: [
+        'On <b>SW1</b>, list flash and find <b>vlan.dat</b>.',
+        'Save the configuration on <b>R1</b>, <b>SW1</b> and <b>R2</b>.',
+      ],
+      done: 'All three devices are saved.',
+      why: 'vlan.dat holds the VLAN database and is NOT part of running-config. Restoring a config without it leaves you with VLAN assignments and no VLANs — a painful and very common surprise.' },
   ],
   steps: [
     { d: 'R1', t: 'See what is stored on the device.', c: ['enable', 'terminal length 0', 'show flash:'], note: 'The IOS image, its exact filename and the free space. That filename is what you type during an upgrade, so read it carefully.' },
@@ -264,14 +533,88 @@ L({
   },
   intro: `<b>The situation:</b> an IP phone and a PC share a desk and a cable. When somebody starts a large upload, the call breaks up. The link is not broken — it is <em>congested</em>, and congestion treats a voice packet exactly like a backup packet unless you tell it otherwise.<br><b>Your goal:</b> set up the switch end of a QoS design. You will enable QoS, decide where the <b>trust boundary</b> sits, trust the phone's markings while refusing the PC's, and understand what the router does with those markings further along. CCNA QoS is mostly conceptual, but the trust boundary is real configuration and it is where every design starts.`,
   tasks: [
-    { t: 'Understand the problem first: what voice, video and data each need from the network', why: 'Voice needs low delay and near-zero loss but almost no bandwidth. A file transfer needs the opposite. One queue cannot serve both.' },
-    { t: 'Enable QoS globally on the switch', why: 'On a Catalyst, QoS is off by default and every marking is ignored. Nothing below has any effect until this command is typed.' },
-    { t: 'Trust the DSCP markings arriving on the uplink from the router', why: 'The uplink carries traffic from devices you control and that has already been classified. Trusting it preserves the markings end to end.' },
-    { t: 'Trust the phone\'s CoS markings on the phone port — but conditionally', why: 'Conditional trust means "trust the markings only while a Cisco phone is actually detected there". Unplug the phone, plug in a laptop, and trust evaporates automatically.' },
-    { t: 'Refuse to trust anything the PC sends, and force its traffic to a default value', why: 'A PC can mark its own packets as priority voice. If you trust it, any user with the right software can promote their own traffic above your telephony. This is the trust boundary.' },
-    { t: 'Set the default CoS applied to untrusted traffic', why: 'Untrusted traffic is re-marked to the value you choose — normally 0, best effort. That is the switch saying "your opinion of your own importance is noted, and overruled".' },
-    { t: 'Apply the automatic VoIP template on a spare port and see what it sets for you', why: 'auto qos voip is a shortcut that applies Cisco\'s recommended settings. Knowing what it does beats trusting it blindly.' },
-    { t: 'Verify the per-port trust state and save', why: 'show mls qos interface is the one command that tells you whether a port trusts what it receives.' },
+    { t: 'Check whether QoS is doing anything at all yet',
+      do: [
+        'On the <b>SW1</b> tab, enter privileged EXEC, turn off the pager and display the global QoS status.',
+      ],
+      done: 'It reports that QoS is disabled.',
+      why: 'With QoS off, every packet is treated identically and every marking is ignored. That is fine until a link fills up — QoS only matters during congestion.' },
+
+    { t: 'Set up the voice and data ports first',
+      do: [
+        'In configuration mode, set <b>F0/1</b> to access mode in VLAN <b>150</b> and describe it as <b>IP-PHONE-DIRECT</b>.',
+        'Set <b>F0/2</b> to access mode in VLAN <b>10</b>, add a <b>voice VLAN of 150</b>, and describe it as <b>PC-WITH-PHONE-READY</b>.',
+        'Check the result in the interface status output.',
+      ],
+      done: 'One port sits in the voice VLAN and one carries both a data and a voice VLAN.',
+      why: 'The desk port carries data untagged for the PC and is ready to carry voice tagged in VLAN 150 as soon as a phone is placed in front of it — one cable, two VLANs. QoS is applied on top of that separation.' },
+
+    { t: 'Enable QoS globally',
+      do: [
+        'In global configuration mode, enable <b>mls qos</b>.',
+        'Display the global QoS status again.',
+      ],
+      done: 'QoS reports as enabled.',
+      why: 'On a Catalyst this single command changes the behaviour of every port: queues start behaving differently and markings begin to mean something. Nothing below has any effect without it.' },
+
+    { t: 'Trust DSCP on the uplink to the router',
+      do: [
+        'Enter interface <b>G0/1</b> and set it to trust <b>dscp</b>.',
+        'Check the per-interface QoS view for that port.',
+      ],
+      done: 'G0/1 reports trust dscp.',
+      why: 'The uplink carries traffic that was already classified inside your network, so its markings are believed and preserved end to end.' },
+
+    { t: 'Trust the phone conditionally',
+      do: [
+        'Enter interface <b>F0/1</b>.',
+        'Set conditional trust with <b>mls qos trust device cisco-phone</b>, then set the port to trust <b>cos</b>.',
+        'Check the per-interface QoS view.',
+      ],
+      done: 'F0/1 shows a trust setting.',
+      why: 'Conditional trust means the markings are believed only while CDP confirms a Cisco phone is attached. Swap the phone for a laptop and trust evaporates automatically — no ticket, no engineer visit.' },
+
+    { t: 'Refuse to trust the PC and force its traffic to best effort',
+      do: [
+        'Enter interface <b>F0/2</b>.',
+        'Remove any trust with the "no" form, then set the default <b>CoS to 0</b>.',
+        'Check the per-interface QoS view for that port.',
+      ],
+      done: 'F0/2 reports "not trusted" with default COS 0.',
+      why: 'This is the trust boundary. Anything the PC marks for itself is overwritten with best effort — without it, any user with the right software could promote their own traffic above your telephony.' },
+
+    { t: 'Apply the automatic VoIP template on a spare port',
+      do: [
+        'Enter interface <b>F0/3</b>, describe it as <b>SPARE-PHONE-PORT</b>, set it to access VLAN <b>10</b> with voice VLAN <b>150</b>.',
+        'Apply <b>auto qos voip trust</b>.',
+        'Look at the resulting QoS settings on that port.',
+      ],
+      done: 'F0/3 shows the auto-QoS settings.',
+      why: 'auto qos applies Cisco\'s recommended trust and queueing in one line. Convenient — and worth reading afterwards, so you know what it decided on your behalf.' },
+
+    { t: 'Compare the three trust states side by side',
+      do: [
+        'Display the QoS detail for <b>F0/1</b>, <b>F0/2</b> and <b>G0/1</b> in turn.',
+        'Say which of them trusts markings and which does not.',
+      ],
+      done: 'You can point at exactly where the trust boundary sits.',
+      why: 'Being able to say where the boundary is, and why, is the entire CCNA QoS design question.' },
+
+    { t: 'Check the phone is powered as well as prioritised',
+      do: [
+        'Display the inline power status.',
+      ],
+      done: 'The phone port shows as drawing power.',
+      why: 'Phones need power and priority. A QoS design that forgets PoE leaves you with a very well-prioritised dead phone.' },
+
+    { t: 'Prove both VLANs work end to end, then save',
+      do: [
+        'On the <b>PH1</b> tab, run <code>ipconfig</code> and ping <b>10.0.150.1</b>.',
+        'On the <b>PC1</b> tab, run <code>ipconfig</code> and ping <b>10.0.10.1</b>.',
+        'Back on <b>SW1</b>, review the running configuration and save.',
+      ],
+      done: 'Both hosts reach their own gateways and the switch is saved.',
+      why: 'Voice and data share one physical path, sit in different VLANs and receive different priority. That is the design, and the QoS lines should be exactly where you expect: one global, one per port.' },
   ],
   steps: [
     { d: 'SW1', t: 'Look at the QoS state before anything is configured.', c: ['enable', 'terminal length 0', 'show mls qos'], note: 'Disabled. Every packet is treated identically and all markings are ignored — fine until the link fills up.' },
@@ -335,14 +678,101 @@ L({
   },
   intro: `<b>The situation:</b> two devices in their default state. Anyone with a console cable owns them, the web server is running, there is no record of who logged in, and an attacker can guess passwords all night at full speed.<br><b>Your goal:</b> harden them. Individual accounts instead of shared passwords, AAA pointing at the local database, a minimum password length, automatic blocking after repeated failures, and every service you do not use switched off. None of this is exotic — it is the checklist every device should have had applied before it ever carried traffic.`,
   tasks: [
-    { t: 'Replace shared line passwords with individual user accounts', why: 'A shared password tells you nothing about WHO made a change. Individual accounts are the difference between an audit trail and a shrug.' },
-    { t: 'Give accounts privilege levels so not everyone gets full control', why: 'Level 15 is full privileged access; level 1 is read-only user mode. A monitoring account does not need to be able to reload the device.' },
-    { t: 'Enable AAA and point authentication at the local database', why: 'AAA — Authentication, Authorization, Accounting — is the framework. Pointing it at local accounts now means swapping in RADIUS or TACACS+ later is a one-line change.' },
-    { t: 'Move the vty lines onto those accounts with login local', why: 'Without this the lines still use the old shared password, however many accounts you created. It is also a prerequisite for SSH.' },
-    { t: 'Set a minimum password length', why: 'A policy enforced by the device beats a policy written in a document nobody reads.' },
-    { t: 'Block logins automatically after repeated failures', why: 'login block-for turns an attacker\'s unlimited guessing into a handful of attempts per minute, which is the difference between minutes and years to brute-force.' },
-    { t: 'Switch off the services you do not use — HTTP, HTTPS and CDP at the edge', why: 'Every running service is an attack surface. If you are not using the web interface, it should not be listening.' },
-    { t: 'Repeat the whole hardening block on the switch and verify both', why: 'Hardening one device out of two is hardening nothing. The commands are identical, which is the point of drilling them twice.' },
+    { t: 'Look at the unprotected starting state',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC, turn off the pager and display the running configuration.',
+        'Also display the login status.',
+        'Note what is missing: no accounts, no login protection, and the HTTP server running.',
+      ],
+      done: 'You can list three things wrong with the device as shipped.',
+      why: 'This is what a device straight out of the box looks like. Every item you are about to fix is on somebody\'s audit checklist.' },
+
+    { t: 'Create individual accounts with different privilege levels',
+      do: [
+        'In configuration mode, create user <b>netadmin</b> at <b>privilege 15</b> with secret <b>Adm1n-Str0ng-Pass</b>.',
+        'Create user <b>monitor</b> at <b>privilege 1</b> with secret <b>M0nitor-Pass</b>.',
+        'Look at both lines in the running configuration.',
+      ],
+      done: 'Two user accounts exist at two different privilege levels.',
+      why: 'Privilege 15 is full access; privilege 1 lands in user EXEC only. A shared password tells you nothing about WHO made a change — individual accounts are the difference between an audit trail and a shrug.' },
+
+    { t: 'Enable AAA and point it at the local database',
+      do: [
+        'Enable the AAA framework with <b>aaa new-model</b>.',
+        'Try the server-backed forms first: set login authentication to <b>group tacacs+ local</b>, then to <b>group radius local</b>, looking at the configuration each time.',
+        'Finally settle on plain <b>local</b>.',
+      ],
+      done: 'The AAA login method ends as local.',
+      why: 'AAA is Authentication, Authorization and Accounting. In every server-backed form, "local" stays on the end as the fallback — leave it off and an unreachable server locks you out of your own network.' },
+
+    { t: 'Move the console and vty lines onto those accounts',
+      do: [
+        'On <b>console line 0</b>: set <b>login local</b>, an exec-timeout of <b>5 0</b>, and logging synchronous.',
+        'On <b>vty lines 0 through 4</b>: set <b>login local</b>, exec-timeout <b>10 0</b>, and restrict the input transport to <b>ssh</b>.',
+      ],
+      done: 'Both line types use the local accounts, and vty accepts SSH only.',
+      why: 'Restricting the transport refuses Telnet outright — no clear-text management, even if somebody later sets a Telnet password by accident.' },
+
+    { t: 'Protect privileged mode and enforce a password policy',
+      do: [
+        'Set the enable secret to <b>Enable-Str0ng-Pass</b>.',
+        'Set the minimum password length to <b>10</b>.',
+        'Turn on password encryption.',
+        'Review the configuration afterwards.',
+      ],
+      done: 'All three settings appear in the running configuration.',
+      why: 'The minimum length is enforced by the device from now on, and password encryption hides the remaining clear-text passwords from a casual glance — weak, but it stops shoulder-surfing.' },
+
+    { t: 'Slow down anyone guessing passwords',
+      do: [
+        'Configure login blocking: block for <b>30</b> seconds after <b>5</b> attempts within <b>30</b> seconds, and look at the login status.',
+        'Remove that setting with the "no" form and look again.',
+        'Settle on: block for <b>120</b> seconds after <b>3</b> attempts within <b>60</b> seconds.',
+      ],
+      done: 'The login status reports the final values.',
+      why: 'Three failures in a minute locks logins for two minutes. It turns an unlimited brute-force attempt into a handful of guesses per minute — the single cheapest anti-guessing control there is.' },
+
+    { t: 'Switch off the services you do not use',
+      do: [
+        'Disable the <b>HTTP</b> server and the <b>HTTPS</b> server.',
+        'Disable domain lookup as well.',
+        'Check the running configuration.',
+      ],
+      done: 'Both "no ip http" lines are present.',
+      why: 'Every running service is attack surface. Most engineers never touch the web interface, so it should not be listening.' },
+
+    { t: 'Add a legal banner',
+      do: [
+        'Configure a message-of-the-day banner warning that access is authorised only and activity is logged.',
+      ],
+      done: 'The banner line appears in the configuration.',
+      why: 'A banner is not technical protection — it is legal protection. Its absence has genuinely cost prosecutions.' },
+
+    { t: 'Repeat the whole hardening block on the switch',
+      do: [
+        'Switch to the <b>SW1</b> tab and apply the same block: two accounts, AAA with local authentication, enable secret, minimum password length, password encryption and login blocking.',
+        'Try turning AAA off and back on to see what it controls.',
+        'Then set both line types the same way, disable the HTTP and HTTPS servers, and add the banner.',
+      ],
+      done: 'SW1 carries the same protections as R1.',
+      why: 'Hardening one device out of two is hardening nothing. Typing the block a second time is also what makes it a routine rather than a lookup.' },
+
+    { t: 'Do the switch-specific part: describe and mode the access port',
+      do: [
+        'On <b>SW1</b>, describe <b>F0/1</b> as <b>PC1-DESK</b> and set it to access mode.',
+        'Check the interface status.',
+      ],
+      done: 'The port is described and in access mode.',
+      why: 'An unused live port in a meeting room is an open door. Describe what is in use, and disable and park what is not — that part is switch-specific hardening.' },
+
+    { t: 'Verify both devices and confirm users are unaffected',
+      do: [
+        'On <b>R1</b>, check the login status and the running configuration, then save.',
+        'Save <b>SW1</b> as well.',
+        'On the <b>PC1</b> tab, run <code>ipconfig</code> and ping <b>10.0.0.1</b> and <b>10.0.0.2</b>.',
+      ],
+      done: 'Both devices are saved and the PC still reaches them.',
+      why: 'Read it as an auditor would: who can log in, how are they authenticated, what is listening, and what happens after failed attempts. Hardening should be invisible to users — if it is not, something is broken.' },
   ],
   steps: [
     { d: 'R1', t: 'Look at the unprotected starting state.', c: ['enable', 'terminal length 0', 'show running-config', 'show login'], note: 'No accounts, no login protection, and the HTTP server running. This is what a device straight from the box looks like.' },
@@ -415,14 +845,105 @@ L({
   },
   intro: `<b>The situation:</b> ARP has no security whatsoever. Any device can announce "I am the default gateway" and every host on the segment will believe it, sending their traffic to an attacker who quietly forwards it on. That is ARP poisoning, and it is the standard man-in-the-middle attack on a switched LAN.<br><b>Your goal:</b> stop it with <b>Dynamic ARP Inspection</b>. DAI checks every ARP message arriving on an untrusted port against the DHCP snooping binding table and drops anything that does not match. That dependency is the key fact: <b>DAI without DHCP snooping has nothing to check against</b>, which is why this lab configures both.`,
   tasks: [
-    { t: 'Get the hosts working with DHCP first, so the binding table has something in it', why: 'DAI validates ARP against the snooping bindings. No leases, no bindings, nothing to validate — and every host loses connectivity.' },
-    { t: 'Enable DHCP snooping on the VLAN and trust the uplink', why: 'The binding table is built by snooping DHCP traffic. It records IP, MAC, VLAN and port for every lease — exactly what DAI needs.' },
-    { t: 'Enable Dynamic ARP Inspection on the same VLAN', why: 'DAI is enabled per VLAN, just like snooping. Both commands take a VLAN list, and both must cover the VLAN your hosts are in.' },
-    { t: 'Trust the uplink for ARP inspection as well as for snooping', why: 'The uplink carries legitimate ARP from the router and the rest of the network. Leave it untrusted and you will inspect — and drop — your own gateway.' },
-    { t: 'Confirm the access ports are untrusted, which is the default and the point', why: 'Untrusted ports are where users plug in, and where an attacker would. Those are exactly the ports whose ARP you want checked.' },
-    { t: 'Add the optional validation checks for source MAC, destination MAC and IP', why: 'By default DAI only checks the IP-to-MAC binding inside the ARP body. The extra checks compare it with the Ethernet header and reject impossible addresses.' },
-    { t: 'Rate-limit ARP on the access ports', why: 'ARP is a broadcast. A flood of it is a denial of service, so untrusted ports get a packets-per-second cap and err-disable if it is exceeded.' },
-    { t: 'Verify with show ip arp inspection and confirm hosts still work', why: 'Security that breaks the users gets switched off by Monday. Always confirm normal traffic survives.' },
+    { t: 'Confirm the DHCP service the whole lab depends on',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC, turn off the pager and display the running configuration and the DHCP bindings.',
+        'Note the pool covering 10.0.0.0/24 with the first nine addresses excluded.',
+      ],
+      done: 'You can see the pool exists and no leases have been handed out yet.',
+      why: 'Dynamic ARP Inspection validates ARP against DHCP snooping\'s binding table. No leases means no bindings, and nothing for DAI to check against.' },
+
+    { t: 'Lease addresses on both hosts',
+      do: [
+        'On the <b>PC1</b> tab run <code>ipconfig /renew</code> then <code>ipconfig</code>.',
+        'Do the same on the <b>PC2</b> tab.',
+      ],
+      done: 'Both hosts hold addresses in 10.0.0.x.',
+      why: 'Two normal DORA exchanges. The switch is watching them — that is how the binding table gets built, and that table is what DAI will enforce.' },
+
+    { t: 'Turn on DHCP snooping, the foundation DAI stands on',
+      do: [
+        'On the <b>SW1</b> tab, enter configuration mode.',
+        'Enable DHCP snooping globally, then scope it to <b>VLAN 1</b>.',
+        'Display the snooping status.',
+      ],
+      done: 'Snooping is enabled and VLAN 1 is listed.',
+      why: 'Two commands: enable, then scope. Neither on its own does anything useful — a favourite exam trap.' },
+
+    { t: 'Trust the uplink for snooping',
+      do: [
+        'Enter interface <b>G0/1</b> and mark it as a trusted port for DHCP snooping.',
+        'Check the snooping status again.',
+      ],
+      done: 'Gi0/1 is listed as trusted.',
+      why: 'Only the uplink may carry server messages. A rogue DHCP server on a desk port would have its offers dropped the moment they arrived.' },
+
+    { t: 'Look at ARP inspection before enabling it',
+      do: [
+        'Display the ARP inspection status.',
+        'Note that no VLANs are listed, every port is untrusted, and all three validation checks are disabled.',
+      ],
+      done: 'You can describe the default state in one sentence.',
+      why: 'Knowing the defaults means you can spot in seconds which line somebody added or removed on a device you have never seen.' },
+
+    { t: 'Enable DAI on the VLAN, then switch it off and on again',
+      do: [
+        'Enable ARP inspection for <b>VLAN 1</b> and check the status.',
+        'Disable it with the "no" form and check again.',
+        'Re-enable it for VLAN 1.',
+      ],
+      done: 'The VLAN ends up reading Enabled and Active.',
+      why: 'Every ARP message on an untrusted port in that VLAN is now checked against the snooping bindings. Typing both directions makes the command pair stick.' },
+
+    { t: 'Trust the uplink for ARP inspection too — and practise the "no" form',
+      do: [
+        'Enter interface <b>G0/1</b> and mark it trusted for ARP inspection, then check the per-interface view.',
+        'Remove the trust with the "no" form and look again.',
+        'Put the trust back.',
+      ],
+      done: 'Gi0/1 finishes as Trusted.',
+      why: 'The router\'s ARP is legitimate and has no DHCP binding, because it is statically addressed. Forget this line and DAI drops your own gateway\'s ARP, taking the whole LAN down.' },
+
+    { t: 'Confirm the access ports stay untrusted',
+      do: [
+        'Check that <b>F0/1</b> and <b>F0/2</b> are still listed as untrusted.',
+      ],
+      done: 'Both access ports read Untrusted.',
+      why: 'Untrusted ports are where users — and attackers — plug in. Those are exactly the ports whose ARP you want inspected.' },
+
+    { t: 'Add the optional validation checks, and learn how the command behaves',
+      do: [
+        'Enable validation of <b>src-mac</b> only, and look at the status.',
+        'Remove the validation with the "no" form and look again.',
+        'Then enable <b>src-mac dst-mac ip</b> all in one command.',
+      ],
+      done: 'All three checks report as Enabled.',
+      why: 'Naming one check REPLACES the list rather than adding to it, and the "no" form clears the lot — so always type every check you want in a single command.' },
+
+    { t: 'Rate-limit ARP on the access ports',
+      do: [
+        'Select <b>F0/1 and F0/2</b> as a range and set an ARP inspection rate limit of <b>10</b> packets per second.',
+        'Check the per-interface view.',
+      ],
+      done: 'Both access ports show a rate of 10.',
+      why: 'ARP is a broadcast, so a flood of it is a denial of service. Ten per second is generous for a PC and hostile to a flooder; exceeding it err-disables the port.' },
+
+    { t: 'Park the unused port safely',
+      do: [
+        'Enter <b>F0/3</b>, describe it as <b>UNUSED</b>, set it to access mode and disable it.',
+        'Check the interface status.',
+      ],
+      done: 'F0/3 reads disabled.',
+      why: 'The port an attacker would use is the one nobody is watching.' },
+
+    { t: 'Prove legitimate hosts are unaffected, then verify and save',
+      do: [
+        'On <b>PC1</b>, run <code>ipconfig /renew</code> and ping <b>10.0.0.1</b>.',
+        'On <b>PC2</b>, run <code>ipconfig</code> and ping <b>10.0.0.1</b>.',
+        'Back on <b>SW1</b>, display the ARP inspection status and the snooping status, then save.',
+      ],
+      done: 'Both hosts work and the switch is saved.',
+      why: 'DAI only drops ARP that contradicts the binding table — which is precisely what an attacker must send. Read the two outputs together: snooping builds the table, DAI enforces it.' },
   ],
   steps: [
     { d: 'R1', t: 'Confirm the DHCP service the hosts depend on.', c: ['enable', 'terminal length 0', 'show running-config', 'show ip dhcp binding'], note: 'A pool covering 10.0.0.0/24 with the first nine addresses excluded for infrastructure. No leases yet.' },
@@ -496,13 +1017,98 @@ L({
   },
   intro: `<b>The situation:</b> the same handful of devices you have been configuring all course, arranged the way a real campus is arranged — an <b>access</b> switch where users plug in, a <b>distribution</b> switch doing the routing between VLANs, an <b>edge</b> router facing the provider, and the provider itself.<br><b>Your goal:</b> build a small collapsed-core design and see why the roles exist. You will dual-link the access switch to the distribution layer and bundle those links, route between VLANs on the distribution switch, and point a default route at the ISP. Along the way the explanation covers the WAN options, virtualization and the cloud service models — the theory chapters that this configuration gives a shape to.`,
   tasks: [
-    { t: 'Build the access layer: a user VLAN, an access port and the edge protections that belong there', why: 'The access layer is where users, phones and access points connect. Port security, portfast and BPDU guard all live here and nowhere else.' },
-    { t: 'Dual-link the access switch to the distribution switch and bundle the links', why: 'Every access switch should have two uplinks to two distribution devices. Bundling them into an EtherChannel means both carry traffic instead of one sitting blocked by spanning tree.' },
-    { t: 'Make the distribution switch the routing layer with an SVI for the user VLAN', why: 'In a collapsed-core design the distribution switch is the boundary between layer 2 and layer 3 — the default gateway for every user VLAN.' },
-    { t: 'Connect the distribution layer to the edge router with a routed link', why: 'Above the distribution layer everything is routed. A routed link between them means no spanning tree and no VLANs to worry about.' },
-    { t: 'Point a default route at the provider, and a route back down to the campus', why: 'The edge router knows the internet is "that way" and the campus is "this way". Two routes are the whole of a small site\'s routing table.' },
-    { t: 'Prove a user can reach the provider through all four devices', why: 'Access to distribution to edge to ISP. If a packet completes that journey, your design works.' },
-    { t: 'Read the explanation on WAN options, virtualization and cloud models', why: 'Chapters 16 and 17 are examined as concepts rather than configuration, but the vocabulary appears in questions about this exact topology.' },
+    { t: 'Build the access layer: VLAN, access port and edge protections',
+      do: [
+        'On the <b>ACC1</b> tab, enter privileged EXEC, turn off the pager and go into configuration mode.',
+        'Create VLAN <b>10</b> named <b>USERS</b>.',
+        'On <b>F0/1</b>: describe it as <b>USER-DESK-PORT</b>, set access mode in VLAN 10, and enable <b>portfast</b> and <b>BPDU guard</b>.',
+      ],
+      done: 'The user port is in VLAN 10 with both edge protections.',
+      why: 'That is the access layer\'s job description in five lines: put the user in a VLAN, come up instantly, and refuse to let anyone plug a switch into a desk port.' },
+
+    { t: 'Add port security, which also belongs at the edge',
+      do: [
+        'Still inside <b>F0/1</b>, enable port security with a maximum of <b>2</b> addresses, <b>sticky</b> learning and violation mode <b>restrict</b>.',
+        'Check the port-security summary.',
+      ],
+      done: 'Fa0/1 shows max 2 and violation Restrict.',
+      why: 'Maximum 2 allows a PC behind an IP phone. Restrict drops and logs the offending traffic rather than shutting the port down, which suits a user-facing port.' },
+
+    { t: 'Bundle the two uplinks to the distribution switch',
+      do: [
+        'Select <b>G0/1 and G0/2</b> as a range and put them in <b>channel-group 1 mode active</b>.',
+        'Enter interface <b>Port-channel 1</b>, set it to <b>trunk</b> mode and allow only VLAN <b>10</b>.',
+        'Check the EtherChannel summary.',
+      ],
+      done: 'Po1 exists and is trunking.',
+      why: 'Every access switch should have two uplinks. Without a bundle, spanning tree blocks one of them and you pay for a cable you never use.' },
+
+    { t: 'Match the bundle on the distribution switch',
+      do: [
+        'Switch to the <b>DIST</b> tab and enter configuration mode.',
+        'Create VLAN <b>10</b> named <b>USERS</b>.',
+        'Put <b>G0/1 and G0/2</b> in <b>channel-group 1 mode active</b>, then trunk <b>Port-channel 1</b> allowing VLAN 10.',
+        'Check the EtherChannel summary.',
+      ],
+      done: 'Both switches show a formed bundle.',
+      why: 'Both ends must agree. A bundle configured on one side only leaves the links flapping or blocked — worse than not bundling at all.' },
+
+    { t: 'Make the distribution switch the routing layer',
+      do: [
+        'On <b>DIST</b>, enable <b>ip routing</b>.',
+        'Create interface <b>Vlan 10</b> with address <b>10.1.10.1</b> mask <b>255.255.255.0</b> and enable it.',
+      ],
+      done: 'The SVI is up with the user gateway address.',
+      why: 'This SVI is every user\'s default gateway, and it is the layer-2 to layer-3 boundary of the whole campus — the defining feature of a collapsed-core design.' },
+
+    { t: 'Use a routed port up to the edge router',
+      do: [
+        'On <b>DIST</b>, enter interface <b>G0/3</b>, describe it as <b>ROUTED-LINK-TO-EDGE</b>.',
+        'Convert it to a routed port with <b>no switchport</b>, give it <b>10.1.99.1</b> mask <b>255.255.255.252</b>, and enable it.',
+      ],
+      done: 'G0/3 appears in the interface summary with an IP address.',
+      why: 'Above the distribution layer everything is routed. A routed link means no spanning tree, no VLANs and no trunk to misconfigure.' },
+
+    { t: 'Point the distribution switch at the edge for everything unknown',
+      do: [
+        'On <b>DIST</b>, create a default route (<b>0.0.0.0 0.0.0.0</b>) via <b>10.1.99.2</b>.',
+        'Display the routing table.',
+      ],
+      done: 'A default route appears.',
+      why: 'A default route is the whole of a distribution switch\'s upstream routing. Anything not local goes to the edge and stops being its problem.' },
+
+    { t: 'Give the edge router its two routes',
+      do: [
+        'Switch to the <b>EDGE</b> tab, enter configuration mode.',
+        'Create a default route via <b>203.0.113.1</b> (the provider).',
+        'Create a route for <b>10.1.10.0</b> mask <b>255.255.255.0</b> via <b>10.1.99.1</b> (back down to the campus).',
+        'Display the routing table.',
+      ],
+      done: 'Both routes are present.',
+      why: 'Out to the provider, back down to the campus. Two lines, and a small site is routed.' },
+
+    { t: 'Test from the edge in both directions',
+      do: [
+        'From <b>EDGE</b>, ping <b>203.0.113.1</b>, then ping <b>10.1.10.1</b>.',
+      ],
+      done: 'Both answer.',
+      why: 'The edge router sits between two worlds and must reach both. Testing from there isolates whether a later failure is upstream or downstream.' },
+
+    { t: 'Prove the whole path works from a user desk',
+      do: [
+        'On the <b>PC1</b> tab, run <code>ipconfig</code>, ping <b>10.1.10.1</b>, ping <b>203.0.113.1</b>, then run <code>tracert 203.0.113.1</code>.',
+      ],
+      done: 'The trace shows the distribution switch, the edge router, then the provider.',
+      why: 'Access to distribution to edge to provider. Note the access switch never appears in the trace, exactly as a layer-2 device should not.' },
+
+    { t: 'Verify and save all three managed devices',
+      do: [
+        'On <b>ACC1</b>: check the EtherChannel summary and interface status, then save.',
+        'On <b>DIST</b>: check the routing table and EtherChannel summary, then save.',
+        'On <b>EDGE</b>: check the routing table and save.',
+      ],
+      done: 'All three devices are saved.',
+      why: 'The three layers each have a different job, and the verification commands you reach for differ accordingly — that difference IS the architecture.' },
   ],
   steps: [
     { d: 'ACC1', t: 'Build the access layer.', c: ['enable', 'terminal length 0', 'configure terminal', 'vlan 10', 'name USERS', 'exit', 'interface f0/1', 'description USER-DESK-PORT', 'switchport mode access', 'switchport access vlan 10', 'spanning-tree portfast', 'spanning-tree bpduguard enable', 'exit'], note: 'Access layer job description in five lines: put the user in a VLAN, come up instantly, and refuse to let anyone plug in a switch.' },
@@ -574,13 +1180,85 @@ L({
   },
   intro: `<b>The situation:</b> a lightweight access point and a wireless LAN controller need to go onto the network, and two new wireless networks — staff and guest — need somewhere to land.<br><b>Your goal:</b> do the part of wireless that happens on the <b>command line</b>, which is the switch side: a management VLAN for the AP, PoE to power it, a trunk carrying the user VLANs, and the controller reachable. The wireless configuration itself — SSIDs, security policies, RF settings — is done in the WLC's web interface, so the explanation below walks through that in full, along with the radio and security theory the exam tests.`,
   tasks: [
-    { t: 'Create the VLANs a wireless deployment needs: AP management, staff and guest', why: 'Guest traffic must never share a VLAN with staff traffic. The separation happens on the wired side, and the SSIDs are simply mapped onto it.' },
-    { t: 'Power the access point over Ethernet and confirm it is drawing power', why: 'APs are usually mounted in ceilings where there is no power socket. PoE is not an optional extra — it is how the AP turns on.' },
-    { t: 'Configure the AP port correctly for a lightweight AP', why: 'A lightweight AP tunnels all user traffic to the controller inside CAPWAP, so its switch port only needs the management VLAN — an access port, not a trunk.' },
-    { t: 'Put the controller on the management VLAN and make sure the AP can reach it', why: 'An AP with no controller sits there flashing. The CAPWAP tunnel between them carries both management and, in local mode, user traffic.' },
-    { t: 'Make the uplink a trunk carrying all three VLANs', why: 'The controller places user traffic into the staff and guest VLANs, so those VLANs must exist on the path between the controller and the router.' },
-    { t: 'Give each wireless VLAN a gateway on the router', why: 'Wireless clients are ordinary IP hosts once their traffic leaves the tunnel. They need a default gateway like anyone else.' },
-    { t: 'Verify power, VLANs, trunking and reachability, then read the wireless theory', why: 'Everything CLI-configurable in CCNA wireless is on this switch. The rest is the WLC GUI, covered in the explanation.' },
+    { t: 'Create the three VLANs a wireless deployment needs',
+      do: [
+        'On the <b>SW1</b> tab, enter privileged EXEC, turn off the pager and go into configuration mode.',
+        'Create VLAN <b>90</b> named <b>AP-MGMT</b>, VLAN <b>20</b> named <b>WIFI-STAFF</b>, and VLAN <b>30</b> named <b>WIFI-GUEST</b>.',
+        'Check the VLAN table.',
+      ],
+      done: 'All three VLANs are listed.',
+      why: 'Management for the infrastructure, one VLAN per SSID for the users. Guest traffic stays separate from staff traffic from the very first hop, on the wired side.' },
+
+    { t: 'Configure the access point\'s switch port',
+      do: [
+        'Enter interface <b>F0/1</b> and describe it as <b>LIGHTWEIGHT-AP-CEILING-1</b>.',
+        'Set it to <b>access</b> mode in VLAN <b>90</b>.',
+        'Enable <b>power inline auto</b> and <b>portfast</b>.',
+      ],
+      done: 'F0/1 is an access port in VLAN 90 with PoE enabled.',
+      why: 'An ACCESS port, not a trunk. A lightweight AP wraps all client traffic in CAPWAP and sends it to the controller, so this port never sees the user VLANs. An autonomous AP would need a trunk — that distinction is a favourite exam question.' },
+
+    { t: 'Confirm the access point is actually being powered',
+      do: [
+        'Return to privileged EXEC and display the inline power status.',
+        'Check the wattage and class reported for F0/1.',
+      ],
+      done: 'The AP port shows as drawing power.',
+      why: 'An AP that will not boot is a PoE budget question before it is a wireless question — check power before you start reading controller logs.' },
+
+    { t: 'Connect the wireless LAN controller',
+      do: [
+        'Enter interface <b>F0/2</b>, describe it as <b>WLC-MANAGEMENT</b>, and set it to access mode in VLAN <b>90</b>.',
+        'Check the interface status.',
+      ],
+      done: 'The controller port is in the management VLAN.',
+      why: 'In this lab the controller shares the management VLAN with the AP. In a real deployment it is often central, with CAPWAP tunnels arriving from every site.' },
+
+    { t: 'Trunk the uplink so the user VLANs can reach their gateways',
+      do: [
+        'Enter interface <b>G0/1</b>, describe it as <b>UPLINK-TO-ROUTER</b>.',
+        'Set it to <b>trunk</b> mode, allow VLANs <b>20,30,90</b>, and add <b>nonegotiate</b>.',
+        'Check the trunk status.',
+      ],
+      done: 'The trunk carries exactly those three VLANs with DTP disabled.',
+      why: 'The controller places each SSID\'s traffic into its VLAN, and from there it travels as ordinary tagged Ethernet. Management rides the same trunk.' },
+
+    { t: 'Check the gateways waiting for the wireless clients',
+      do: [
+        'Switch to the <b>R1</b> tab, enter privileged EXEC and display the interface summary and the running configuration.',
+        'Find the three subinterfaces, one per VLAN.',
+      ],
+      done: 'You can name the gateway address for each wireless VLAN.',
+      why: 'Router-on-a-stick again. Wireless clients are ordinary IP hosts the moment their traffic leaves the CAPWAP tunnel — they need a gateway like anyone else.' },
+
+    { t: 'Confirm the access point has network connectivity',
+      do: [
+        'On the <b>AP1</b> tab, run <code>ipconfig</code> and ping its gateway <b>10.0.90.1</b>.',
+      ],
+      done: 'The AP reaches its gateway.',
+      why: 'An AP needs an address, a gateway and a route to its controller. Get those three right and the CAPWAP tunnel builds itself.' },
+
+    { t: 'Confirm the AP can reach its controller',
+      do: [
+        'Still on <b>AP1</b>, ping <b>10.0.90.5</b> — the controller.',
+      ],
+      done: 'The controller answers.',
+      why: 'CAPWAP uses UDP 5246 for control and 5247 for data. If the AP cannot reach the controller it will keep rebooting and searching, with nothing obviously wrong on the wireless side.' },
+
+    { t: 'Check the same path from the controller',
+      do: [
+        'On the <b>WLC</b> tab, run <code>ipconfig</code>, ping <b>10.0.90.10</b> (the AP) and <b>10.0.90.1</b> (the gateway).',
+      ],
+      done: 'Both answer.',
+      why: 'With this working, everything else — SSIDs, security policies, RF settings — happens in the controller\'s web interface, which is the part of CCNA wireless that is not CLI. The Explanation tab walks through it.' },
+
+    { t: 'Verify the whole switch-side build and save',
+      do: [
+        'On <b>SW1</b>: check the VLAN table, the trunk status, the inline power and the interface status.',
+        'Save the configuration.',
+      ],
+      done: 'All four views match what you configured and the switch is saved.',
+      why: 'VLANs, trunk, power and port modes — that is every wireless-related command CCNA expects you to type on a switch.' },
   ],
   steps: [
     { d: 'SW1', t: 'Create the three VLANs a wireless deployment needs.', c: ['enable', 'terminal length 0', 'configure terminal', 'vlan 90', 'name AP-MGMT', 'vlan 20', 'name WIFI-STAFF', 'vlan 30', 'name WIFI-GUEST', 'exit', 'do show vlan brief'], note: 'Management for the infrastructure, one VLAN per SSID for the users. Guest traffic stays separate from staff traffic from the very first hop.' },
@@ -651,13 +1329,85 @@ L({
   },
   intro: `<b>The situation:</b> you have now typed the same block of configuration onto five devices by hand more than once in this course. That is exactly the problem automation exists to solve — not because typing is hard, but because typing is <em>inconsistent</em>, and inconsistency is what causes outages.<br><b>Your goal:</b> prepare two devices for programmatic management. You will create a service account, switch on the encrypted transport an API needs, enable <b>RESTCONF</b> and <b>NETCONF</b>, and look at the configuration data an API would return. The explanation then covers SDN, REST, the three data formats and the configuration-management tools — the chapters that close out the CCNA.`,
   tasks: [
-    { t: 'Create a service account for the automation tooling, separate from human accounts', why: 'A tool that logs in as a person is a tool nobody can audit. Give automation its own identity with its own credentials.' },
-    { t: 'Make sure SSH is configured, because every automation transport depends on it', why: 'NETCONF runs over SSH, Ansible drives IOS over SSH, and RESTCONF needs HTTPS. Secure transport is the prerequisite for all of it.' },
-    { t: 'Enable the HTTPS server that RESTCONF is served over, and leave plain HTTP off', why: 'RESTCONF is an HTTP API. It must be the encrypted one — an unencrypted management API is a credential leak with a REST interface.' },
-    { t: 'Enable RESTCONF and NETCONF on both devices', why: 'These are the two standard programmatic interfaces on IOS-XE. RESTCONF is HTTP-based and easy to call; NETCONF is XML over SSH with transactions and rollback.' },
-    { t: 'Look at the configuration data an API request would actually return', why: 'show running-config is the same data a RESTCONF GET returns, only formatted for humans instead of machines. Seeing them as the same thing is the conceptual leap.' },
-    { t: 'Confirm the management station can reach both devices', why: 'An automation controller that cannot reach a device manages nothing. Reachability first, API second.' },
-    { t: 'Read the explanation on SDN, REST, data formats and the tooling', why: 'These chapters are examined entirely as concepts — vocabulary, verbs, response codes and which format uses which punctuation.' },
+    { t: 'Create a service account for the tooling, separate from human accounts',
+      do: [
+        'On the <b>R1</b> tab, enter privileged EXEC, turn off the pager and go into configuration mode.',
+        'Create user <b>automation</b> at <b>privilege 15</b> with secret <b>Aut0mation-Pass</b>.',
+        'Look at the line in the running configuration.',
+      ],
+      done: 'The account exists at privilege 15.',
+      why: 'A tool that logs in as a person is a tool nobody can audit. Give automation its own identity so change records show whether a human or a playbook made the change.' },
+
+    { t: 'Build the secure transport everything else depends on',
+      do: [
+        'Set the hostname to <b>R1</b> and the IP domain name to <b>netdrill.lab</b>.',
+        'Generate RSA keys with modulus <b>2048</b> and set SSH to version <b>2</b>.',
+        'On <b>vty lines 0 through 4</b>, set <b>login local</b> and restrict the transport to <b>ssh</b>.',
+      ],
+      done: 'The SSH stack is complete on R1.',
+      why: 'NETCONF rides directly on SSH, Ansible drives IOS over SSH, and RESTCONF needs HTTPS. Secure transport is the prerequisite for all of it.' },
+
+    { t: 'Enable the encrypted web server RESTCONF is served over',
+      do: [
+        'Enable the <b>HTTPS</b> server and disable the plain <b>HTTP</b> server.',
+        'Check both lines in the running configuration.',
+      ],
+      done: 'HTTPS is on and HTTP is off.',
+      why: 'RESTCONF is an HTTP API, so it needs the web server — but only the encrypted one. An unencrypted management API is a credential leak with a REST interface.' },
+
+    { t: 'Turn on the two programmatic interfaces, and practise switching them off',
+      do: [
+        'Enable <b>restconf</b> and <b>netconf-yang</b>, then look at the configuration.',
+        'Disable both with their "no" forms and look again.',
+        'Re-enable both.',
+      ],
+      done: 'Both agents are enabled at the end.',
+      why: 'RESTCONF listens on HTTPS port 443; NETCONF on SSH port 830. Both expose the same YANG data models — one over REST, one over XML-RPC.' },
+
+    { t: 'Check the NETCONF agent',
+      do: [
+        'Display the NETCONF-YANG sessions.',
+      ],
+      done: 'The agent responds with an empty session list.',
+      why: 'No sessions is exactly what you expect until a controller or a script connects. What matters is that the agent answered at all.' },
+
+    { t: 'Repeat the entire preparation on the switch',
+      do: [
+        'Switch to the <b>SW1</b> tab and apply the same block: the automation account, hostname and domain, RSA keys, SSH version 2, vty lines with local login and SSH-only transport, HTTPS on and HTTP off, then restconf and netconf-yang.',
+      ],
+      done: 'SW1 carries the same configuration as R1.',
+      why: 'Typing this block twice by hand is precisely the argument for automating it. In Ansible it would be one task applied to a group of devices.' },
+
+    { t: 'Look at the data an API request would return',
+      do: [
+        'On <b>R1</b>, display the running configuration, the brief interface summary and the version information.',
+        'Imagine each one as JSON rather than text.',
+      ],
+      done: 'You can describe what a RESTCONF GET against the interfaces model would contain.',
+      why: 'The device holds the same data either way. The only difference is whether a human or a machine is reading it — that realisation is the conceptual leap of the whole chapter.' },
+
+    { t: 'Confirm the management station can reach both devices',
+      do: [
+        'On the <b>MGMT</b> tab, run <code>ipconfig</code>, then ping <b>10.0.0.1</b> and <b>10.0.0.2</b>.',
+      ],
+      done: 'Both devices answer.',
+      why: 'An automation controller needs IP reachability and credentials, nothing more exotic. This is the out-of-band management network idea in miniature.' },
+
+    { t: 'Make a change the way automation would — twice',
+      do: [
+        'On <b>R1</b>, set the description of interface <b>G0/1</b> to <b>MANAGED-BY-AUTOMATION</b>.',
+        'Then apply exactly the same command a second time.',
+        'Display the interface and confirm there is only one description.',
+      ],
+      done: 'The second application changed nothing.',
+      why: 'That property is called <b>idempotency</b>, and it is what makes it safe to re-run a playbook against a live network — the tool declares the desired state rather than a list of changes.' },
+
+    { t: 'Save both devices',
+      do: [
+        'Save the configuration on <b>R1</b> and on <b>SW1</b>.',
+      ],
+      done: 'Both devices are saved.',
+      why: 'The devices are now ready for a controller to manage them — which is where the Explanation tab picks up, with SDN, REST verbs and the data formats.' },
   ],
   steps: [
     { d: 'R1', t: 'Create a dedicated service account for the tooling.', c: ['enable', 'terminal length 0', 'configure terminal', 'username automation privilege 15 secret Aut0mation-Pass', 'do show running-config'], note: 'Separate from human accounts, so logs and change records show whether a person or a playbook made the change.' },

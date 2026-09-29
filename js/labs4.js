@@ -37,19 +37,131 @@ L({
   },
   intro: `<b>The situation:</b> two routers joining four networks — two user LANs, a server LAN holding a web server and a database server, and a branch LAN. Routing already works, so at this moment everything can reach everything.<br><b>Your goal:</b> every kind of access list there is, written repeatedly on <b>both</b> routers until the syntax is automatic. Numbered and named, standard and extended, the <code>host</code> and <code>any</code> shortcuts, wildcard masks, TCP and ICMP matching, port numbers, sequence numbers including inserting a rule between two existing ones, both directions of application, protecting the router's own vty lines, and finally removing lists cleanly.`,
   tasks: [
-    { t: 'PHASE 1 — Establish the "before" picture: every PC can reach both servers', why: 'Never apply a filter without knowing what worked beforehand, or you cannot tell your rule from an unrelated fault.' },
-    { t: 'PHASE 2 — On R1, build numbered standard ACL 10 using three different source forms: host, a wildcard network, and any', why: 'All three forms in one list. <code>host X</code> means "X 0.0.0.0" and <code>any</code> means "0.0.0.0 255.255.255.255" — shortcuts for things you could write the long way.' },
-    { t: 'Apply ACL 10 outbound toward R2 and test both PCs', why: 'Standard lists go close to the DESTINATION. They cannot see where traffic is headed, so filtering near the source would block that host from reaching everything.' },
-    { t: 'PHASE 3 — Repeat the whole exercise on R2 with a second numbered standard list', why: 'Second router, same syntax. Repetition on a different device with different numbers is what turns recall into reflex.' },
-    { t: 'PHASE 4 — Build a named standard list on R1 and apply it to the vty lines with access-class', why: 'access-class protects the router itself; ip access-group filters traffic passing through it. Different commands for different jobs — a favourite exam distinction.' },
-    { t: 'Repeat the vty protection on R2 with its own named list', why: 'Every router on a network needs its management plane protected, so you will type this pair many times in real work.' },
-    { t: 'PHASE 5 — On R1, build a named extended list with explicit sequence numbers 10, 20 and 30', why: 'Extended lists match protocol, source, destination and port. Sequence numbers are what make a named list editable later.' },
-    { t: 'Insert a new rule at sequence 25, between two existing lines, and confirm it lands in the right place', why: 'The single biggest advantage of named lists. A numbered list can only be appended to or deleted whole.' },
-    { t: 'Apply the extended list inbound on the interface where PC1\'s traffic arrives', why: 'Extended lists go close to the SOURCE — drop doomed packets at the first router rather than carrying them across the network to die.' },
-    { t: 'PHASE 6 — On R2, build a numbered extended list that blocks one TCP port to one server', why: 'Numbered extended lists live in the 100-199 range. Same matching power, no ability to edit individual lines.' },
-    { t: 'PHASE 7 — Test the full matrix: which host can reach which server, with which protocol', why: 'An access list is not finished until you have proven both what it blocks AND what it still allows.' },
-    { t: 'PHASE 8 — Read every list with show access-lists and confirm each attachment with show ip interface', why: 'Two independent checks. A list that exists but is not applied to an interface filters precisely nothing.' },
-    { t: 'PHASE 9 — Practise removal: detach a list from an interface, delete a numbered list whole, then rebuild both', why: 'Removing a numbered ACL takes every line at once — there is no way to remove just one, which is the main reason to prefer named lists.' },
+    { t: 'PHASE 1 — Establish the "before" picture from every host',
+      do: [
+        'From <b>PC1</b>: <code>ipconfig</code>, then ping <b>10.0.3.100</b> (SRV1) and <b>10.0.3.200</b> (SRV2).',
+        'From <b>PC2</b>: ping both servers.',
+        'From <b>PC3</b>: ping <b>10.0.3.100</b> and <b>10.0.1.10</b>.',
+      ],
+      done: 'Every host reaches everything.',
+      why: 'Never apply a filter without knowing what worked beforehand, or you cannot tell your rule apart from an unrelated fault.' },
+
+    { t: 'PHASE 2 — Build numbered standard ACL 10 using three different source forms',
+      do: [
+        'On <b>R1</b>, create access list <b>10</b> with three lines, in this order:',
+        '<b>permit host 10.0.1.10</b> — the single-host shorthand.',
+        '<b>deny 10.0.2.0 0.0.0.255</b> — a wildcard-matched network.',
+        '<b>permit any</b> — the catch-all, which must come last.',
+        'Then display the access lists and read the three lines back.',
+      ],
+      done: 'List 10 shows three entries in that order.',
+      why: 'Three ways to name a source: host, wildcard network, and any. Order is everything — a deny placed above the permit would block the host you meant to allow.' },
+
+    { t: 'Apply ACL 10 outbound toward R2 and test both PCs',
+      do: [
+        'On <b>R1</b>, apply list <b>10</b> to interface <b>G0/2</b> in the <b>out</b> direction, and confirm with the layer-3 interface view.',
+        'From <b>PC1</b>, ping <b>10.0.3.100</b> — it should still work.',
+        'From <b>PC2</b>, ping <b>10.0.3.100</b> — it should now fail.',
+      ],
+      done: 'PC1 passes and PC2 is blocked.',
+      why: 'Standard lists judge the source address only, so they go close to the destination. Here that means the interface on the path toward the servers.' },
+
+    { t: 'PHASE 3 — Repeat the exercise on R2 with a second numbered list',
+      do: [
+        'On <b>R2</b>, create access list <b>20</b>: <b>deny host 10.0.4.99</b>, then <b>permit 10.0.4.0 0.0.0.255</b>, then <b>permit any</b>.',
+        'Apply it to interface <b>G0/2</b> in the <b>in</b> direction.',
+        'From <b>PC3</b>, ping <b>10.0.3.100</b> to confirm the permitted hosts still pass.',
+      ],
+      done: 'List 20 is applied inbound and PC3 still works.',
+      why: 'The same skill on a second router, with a deny-one-host-then-permit-the-rest shape — the most common real-world standard ACL there is.' },
+
+    { t: 'PHASE 4 — Build a named standard list and protect the vty lines with it',
+      do: [
+        'On <b>R1</b>, create a named standard list <b>VTY-ACCESS</b> permitting <b>10.0.1.0 0.0.0.255</b>.',
+        'On the <b>vty lines 0 4</b>: set a password, enable login, and apply the list with <b>access-class VTY-ACCESS in</b>.',
+        'Check the running configuration.',
+      ],
+      done: 'The access-class line appears under line vty 0 4.',
+      why: '<b>access-class</b> protects the router itself rather than traffic passing through it — it is the command that decides who may even attempt to log in.' },
+
+    { t: 'Repeat the vty protection on R2 with its own named list',
+      do: [
+        'On <b>R2</b>, create a named standard list <b>MGMT-HOSTS</b> permitting <b>10.0.4.0 0.0.0.255</b> and <b>host 10.0.1.10</b>.',
+        'Apply it to the vty lines with access-class, alongside a password and login.',
+      ],
+      done: 'Both routers restrict management access by source address.',
+      why: 'Two entries: a whole management network plus one specific trusted host. This pattern is on every hardening checklist you will ever be handed.' },
+
+    { t: 'PHASE 5 — Build a named extended list with explicit sequence numbers',
+      do: [
+        'On <b>R1</b>, create a named extended list <b>EDGE-IN</b> and type the entries with their own sequence numbers:',
+        '<b>10</b> permit tcp <b>10.0.1.0 0.0.0.255</b> to <b>host 10.0.3.100</b> eq <b>80</b>.',
+        '<b>20</b> permit tcp <b>any</b> to <b>host 10.0.3.100</b> eq <b>443</b>.',
+        '<b>30</b> permit <b>ip any any</b>.',
+        'Display the list and note the numbering.',
+      ],
+      done: 'Three entries numbered 10, 20 and 30.',
+      why: 'Leaving gaps between sequence numbers is deliberate: it gives you room to insert rules later without rebuilding the list, which is the next task.' },
+
+    { t: 'Insert a new rule between two existing lines',
+      do: [
+        'Still inside <b>EDGE-IN</b>, add an entry numbered <b>25</b>: <b>deny icmp any host 10.0.3.100</b>.',
+        'Display the list and confirm it landed between 20 and 30.',
+      ],
+      done: 'The new rule sits at sequence 25, in the middle of the list.',
+      why: 'This is the superpower named lists have over numbered ones. A numbered list would have to be deleted and retyped in full to achieve the same thing.' },
+
+    { t: 'Apply the extended list where the traffic enters',
+      do: [
+        'On <b>R1</b>, apply <b>EDGE-IN</b> to interface <b>G0/0</b> in the <b>in</b> direction, and confirm with the layer-3 interface view.',
+        'From <b>PC1</b>, ping <b>10.0.3.100</b> (now blocked by rule 25) and <b>10.0.3.200</b> (still permitted by rule 30).',
+      ],
+      done: 'One server is unreachable by ping and the other is not.',
+      why: 'Extended lists go close to the source, because they identify traffic exactly and there is no reason to carry doomed packets across the network first.' },
+
+    { t: 'PHASE 6 — On R2, block one TCP port to one server with a numbered extended list',
+      do: [
+        'On <b>R2</b>, create access list <b>120</b>: <b>deny tcp any host 10.0.3.200 eq 23</b>, then <b>permit ip any any</b>.',
+        'Apply it inbound on <b>G0/0</b>.',
+        'From <b>PC1</b>, ping <b>10.0.3.200</b> — ping is unaffected because only TCP 23 is denied.',
+      ],
+      done: 'The list is applied and ICMP still passes.',
+      why: 'Numbers 100-199 are extended lists. Blocking Telnet to one server while leaving everything else alone is precision a standard list cannot manage at all.' },
+
+    { t: 'PHASE 7 — Test the full matrix of who can reach what',
+      do: [
+        'From <b>PC2</b>: ping <b>10.0.3.100</b> and <b>10.0.3.200</b>.',
+        'From <b>PC3</b>: ping both servers as well.',
+        'For each result, name the access-list line responsible.',
+      ],
+      done: 'You can explain every success and every failure by pointing at a line.',
+      why: 'Four lists are now in play across two routers. Being able to trace a packet through all of them is the skill the exam actually tests.' },
+
+    { t: 'PHASE 8 — Read every list and confirm every attachment',
+      do: [
+        'On <b>R1</b>: display the access lists, then the layer-3 view of <b>G0/0</b> and <b>G0/2</b>.',
+        'On <b>R2</b>: the same three commands.',
+      ],
+      done: 'Every list you built is visible, and you can say which interface and direction each is attached to.',
+      why: 'A list that exists but is attached to nothing does nothing — and a list attached in the wrong direction quietly does the opposite of what you intended.' },
+
+    { t: 'PHASE 9 — Practise removal: detach, delete, rebuild',
+      do: [
+        'On <b>R2</b>, detach list <b>20</b> from <b>G0/2</b> and confirm the interface is unfiltered while the list still exists.',
+        'Then delete list <b>20</b> entirely and look at the access lists.',
+        'Rebuild all three of its lines and reattach it, then re-test from <b>PC3</b>.',
+      ],
+      done: 'List 20 is back in place and PC3 still works.',
+      why: 'Detaching and deleting are separate actions. Note that a numbered list can only be removed whole — on a fifty-line production list that is exactly the nightmare named lists were invented to avoid.' },
+
+    { t: 'Finally, create and delete named lists of both types',
+      do: [
+        'On <b>R1</b>, create a standard list <b>SCRATCH-STD</b> and an extended list <b>SCRATCH-EXT</b>, each with one entry.',
+        'Display the lists, then delete both with their "no" forms and display again.',
+        'Save both routers.',
+      ],
+      done: 'Both scratch lists are gone and the routers are saved.',
+      why: 'The "no" form has to repeat the type — standard or extended — exactly as you created it, or IOS cannot find the list to remove.' },
   ],
   steps: [
     /* ---- PHASE 1: baseline ---- */
@@ -170,18 +282,107 @@ L({
   },
   intro: `<b>The situation:</b> two branch offices, each on private addresses, each with a single public address from the same ISP. Site A also runs two servers that are supposed to be reachable from the internet, and right now they have no public identity at all.<br><b>Your goal:</b> the complete NAT command set, configured on <b>both</b> edge routers so every step is done twice. Mark the inside and outside domains, build two permanent one-to-one mappings for the servers, classify the user traffic with an access list, overload the public interface so the whole office shares one address, then practise removing and rebuilding each piece.<br><span class="dim">Note: this simulator models NAT configuration and the translation table rather than rewriting packet headers, so verification here is by <code>show</code> command rather than by pinging the internet — which is exactly how the exam objective is worded.</span>`,
   tasks: [
-    { t: 'PHASE 1 — On R1, mark G0/0 as the NAT inside interface and G0/1 as the NAT outside interface', why: 'NAT only acts on traffic crossing between the two domains. Without both markings, every rule you write below does precisely nothing.' },
-    { t: 'PHASE 2 — Create a static one-to-one mapping for the first server', why: 'Static NAT is permanent and bidirectional, so outsiders can initiate connections inward — exactly what a public server needs.' },
-    { t: 'Create a second static mapping for the other server', why: 'Repetition, and a realistic setup: each public service gets its own public address out of the block the ISP assigned you.' },
-    { t: 'Read the translation table and note both entries exist before any traffic flows', why: 'Static entries are permanent; dynamic ones appear only while a conversation is open. Spotting that difference in show output is exam material.' },
-    { t: 'Name the four NAT address types for one of those mappings', why: 'Inside local is the private address as the LAN sees it; inside global is the public face. "Local is the inside view, global is the outside view" is the phrase to hold on to.' },
-    { t: 'PHASE 3 — Build ACL 1 to classify which inside hosts may be translated, then configure PAT overload out of G0/1', why: 'Here the access list blocks nothing — it is a selector answering "who is allowed to be translated?" ACLs get reused this way all over IOS.' },
-    { t: 'PHASE 4 — Repeat the entire configuration on R2 for the second site', why: 'Second router, same commands, different addresses. This is the repetition that turns a procedure into a reflex.' },
-    { t: 'On R2 use a named access list instead of a numbered one as the classifier', why: 'Both work. Seeing the named form used for NAT reinforces that an ACL is just a traffic matcher, whatever its name.' },
-    { t: 'PHASE 5 — On R1, remove one static mapping, confirm it has gone, then put it back', why: 'On a live network that removal instantly cuts every inbound session to that server. Doing it deliberately once removes the fear of the command.' },
-    { t: 'Remove and rebuild the PAT statement as well', why: 'The dynamic half of the configuration deserves the same treatment. Note the overload keyword has to come back too.' },
-    { t: 'PHASE 6 — Sweep the verification commands on both routers and identify which lines belong to static NAT and which to PAT', why: 'The two mechanisms coexist on one router. Reading a configuration and telling them apart is the real-world skill.' },
-    { t: 'PHASE 7 — Confirm inside connectivity is unaffected, and that both edge routers still reach the ISP', why: 'NAT happens on the way out. Inside-to-inside traffic is untouched, and the underlying routing must still work.' },
+    { t: 'PHASE 1 — Mark the NAT inside and outside interfaces on R1',
+      do: [
+        'On <b>R1</b>, set <b>terminal length 0</b> and read the interface summary: <b>192.168.1.x</b> is the private side, <b>203.0.113.x</b> the public one.',
+        'Mark <b>G0/0</b> as <b>ip nat inside</b>.',
+        'Mark <b>G0/1</b> as <b>ip nat outside</b>, then check the layer-3 view of that interface.',
+      ],
+      done: 'One interface is marked inside and one outside.',
+      why: 'These two lines are the foundation everything else depends on. Forget one and every NAT rule below silently does nothing while the configuration still looks right.' },
+
+    { t: 'PHASE 2 — Create a static mapping for the first server',
+      do: [
+        'On <b>R1</b>, map inside-local <b>192.168.1.100</b> to inside-global <b>203.0.113.100</b>.',
+        'Remember the order: private address first, public address second.',
+      ],
+      done: 'The mapping appears in the configuration.',
+      why: 'Swapping those two addresses produces a configuration that parses perfectly and translates the wrong way round — a classic and hard-to-spot slip.' },
+
+    { t: 'Create a second static mapping for the other server',
+      do: [
+        'Map <b>192.168.1.200</b> to <b>203.0.113.200</b>.',
+        'Then display the NAT translation table.',
+      ],
+      done: 'Two static entries are listed.',
+      why: 'Static NAT burns one public address per host, which is exactly why PAT exists for ordinary users — and why only servers get this treatment.' },
+
+    { t: 'Note that both entries exist before any traffic flows',
+      do: [
+        'Look again at the translation table and at the running configuration.',
+        'Confirm both mappings are present even though nothing has been sent.',
+      ],
+      done: 'The entries are there with no traffic.',
+      why: 'A static mapping is permanent, which is what allows outsiders to initiate connections inward. Dynamic entries appear only while a flow is active.' },
+
+    { t: 'Name the four NAT address types for one of those mappings',
+      do: [
+        'Take the first server and say out loud: what is its <b>inside local</b> address, and what is its <b>inside global</b> address?',
+      ],
+      done: 'You can name both without checking.',
+      why: 'Anchor on "local = as seen from inside, global = as seen from outside". The exam WILL ask you to label these on a diagram.' },
+
+    { t: 'PHASE 3 — Configure PAT for the ordinary user hosts',
+      do: [
+        'On <b>R1</b>, create access list <b>1</b> permitting <b>192.168.1.0 0.0.0.255</b> and look at it.',
+        'Then create the dynamic rule: translate sources matching list <b>1</b>, using interface <b>G0/1</b>, with <b>overload</b>.',
+        'Check the running configuration and the translation table.',
+      ],
+      done: 'The overload statement appears alongside the two static mappings.',
+      why: 'Here the ACL blocks nothing — it classifies who may be translated. Overload rewrites the source port as well as the address, so the whole LAN shares one public address.' },
+
+    { t: 'PHASE 4 — Repeat the whole configuration on R2 for the second site',
+      do: [
+        'On <b>R2</b>, mark <b>G0/0</b> inside and <b>G0/1</b> outside.',
+        'Then prove how fragile those markings are: remove the outside marking, look at the interface, put it back; do the same with the inside marking.',
+      ],
+      done: 'Both markings are restored on R2.',
+      why: 'With either marking missing, the rules still sit in the configuration looking correct and nothing is translated. This is the single most common "NAT is broken" call.' },
+
+    { t: 'On R2, use a named access list as the classifier instead',
+      do: [
+        'Create a named standard list <b>NAT-HOSTS</b> permitting <b>172.16.5.0 0.0.0.255</b>.',
+        'Then create the PAT rule referencing <b>NAT-HOSTS</b> out of interface <b>G0/1</b> with overload.',
+        'Check the configuration and the translation table.',
+      ],
+      done: 'R2 runs PAT driven by a named list.',
+      why: 'Named and numbered lists are interchangeable as classifiers. The named form documents intent — anyone reading NAT-HOSTS knows what it selects without looking it up.' },
+
+    { t: 'PHASE 5 — Remove a static mapping, confirm it has gone, then rebuild it',
+      do: [
+        'On <b>R1</b>, remove the static mapping for <b>192.168.1.200</b> and check the translation table.',
+        'Then add it back and check again.',
+      ],
+      done: 'The second mapping is present again.',
+      why: 'The "no" form must repeat the whole statement, both addresses included. Being able to remove one mapping without disturbing the other is real operational work.' },
+
+    { t: 'Remove and rebuild the PAT statement as well',
+      do: [
+        'On <b>R1</b>, remove the <b>ip nat inside source list 1 … overload</b> statement and look at the configuration.',
+        'Put it straight back.',
+        'Then do the same with the inside marking on <b>G0/0</b>: remove it, look, restore it.',
+      ],
+      done: 'The configuration ends exactly as it started.',
+      why: 'Three separate things can be removed independently — the mapping, the rule and the interface marking — and each produces a different failure. Knowing which is missing is the diagnosis.' },
+
+    { t: 'PHASE 6 — Sweep the verification commands on both routers',
+      do: [
+        'On <b>R1</b>: display the running configuration and the translation table.',
+        'On <b>R2</b>: the same two commands.',
+        'Point at which lines belong to static NAT and which to PAT.',
+      ],
+      done: 'You can separate the static and dynamic halves of the configuration by eye.',
+      why: 'A real edge router runs both at once: static mappings for the servers, overload for everybody else. Reading that mixture correctly is the practical skill.' },
+
+    { t: 'PHASE 7 — Confirm inside connectivity and reachability to the ISP',
+      do: [
+        'From <b>PC1</b>: <code>ipconfig</code>, then ping <b>192.168.1.100</b> and <b>192.168.1.1</b>.',
+        'From <b>R1</b>: ping <b>203.0.113.2</b>. From <b>R2</b>: ping <b>203.0.113.5</b>.',
+        'From <b>PC2</b>: <code>ipconfig</code> and ping <b>172.16.5.1</b>.',
+        'Save both routers.',
+      ],
+      done: 'Inside traffic is unaffected and both edge routers reach the provider.',
+      why: 'NAT applies only as packets cross from inside to outside. Traffic that stays inside is untouched — which is why breaking NAT never breaks the LAN, and vice versa.' },
   ],
   steps: [
     /* ---- PHASE 1: domains ---- */
@@ -287,20 +488,123 @@ L({
   },
   intro: `<b>The situation:</b> a head office and two branches. Four PCs, all set to obtain addresses automatically, and nobody handing any out. Routing between the sites already works, so this drill is purely about DHCP.<br><b>Your goal:</b> make one router the address server for <b>all three</b> subnets. You will build three pools with the complete option set, protect reserved addresses with both forms of the exclusion command, and configure <b>two separate relay agents</b> — because the branch PCs broadcast, and routers do not forward broadcasts. Then you will secure the whole thing so a rogue server on a desk port cannot hijack it.`,
   tasks: [
-    { t: 'PHASE 1 — Confirm all four PCs currently have no address at all', why: 'The starting point. Every one is set to DHCP and nobody is answering.' },
-    { t: 'PHASE 2 — On R1, exclude the gateway address with the single-address form, then the rest of the low range with the range form', why: 'Two forms of the same command. Exclusions protect addresses you assigned by hand, and on real gear you do them BEFORE creating the pool or a client may lease .1 while you are typing.' },
-    { t: 'Repeat the exclusions for both branch subnets', why: 'R1 will serve those subnets too, so their gateways need the same protection. Three subnets, three sets of exclusions.' },
-    { t: 'PHASE 3 — Build pool LAN1 for the local subnet with network, default-router, dns-server, domain-name and lease', why: 'The full option set. A lease carries far more than an address, which is why a DHCP client comes up fully working.' },
-    { t: 'PHASE 4 — Build pools LAN2 and LAN3 for the two branch subnets', why: 'Two more repetitions of the same five lines. Note R1 is not attached to either of those networks.' },
-    { t: 'PHASE 5 — Renew both local PCs and confirm they receive addresses, gateways and DNS servers', why: 'The local case works immediately, because these PCs share a broadcast domain with the server.' },
-    { t: 'PHASE 6 — Try renewing a branch PC and watch it fail', why: 'Feel the failure before fixing it. Routers drop broadcasts, so the request never leaves the branch LAN.' },
-    { t: 'Add a helper address on R2 facing its LAN, and renew the branch PC again', why: 'The relay converts the broadcast into a unicast to the real server, stamping it with its own interface address so the server knows which pool to use.' },
-    { t: 'PHASE 7 — Repeat the whole relay configuration on R3 for the second branch', why: 'Second relay, same command, different router. This is the repetition that makes the concept stick.' },
-    { t: 'PHASE 8 — Inspect the server\'s bindings and every client\'s full configuration', why: 'Two ends of the same lease: the server\'s record of who holds what, and each client\'s view including its MAC and DHCP status.' },
-    { t: 'PHASE 9 — Remove one pool, confirm it has gone, then rebuild it', why: 'Deleting a pool on a live network stops new leases for that subnet immediately. Doing it deliberately once removes the fear.' },
-    { t: 'Try putting a helper address on the wrong interface and reason about why it would not work', why: 'The helper belongs on the interface that HEARS the clients, not the one facing the server. Getting that backwards is the classic mistake.' },
-    { t: 'PHASE 10 — On SW1, enable DHCP snooping, scope it to VLAN 1, and trust only the uplink toward R1', why: 'Every port starts untrusted. Server messages arriving from a desk port are dropped, which kills rogue DHCP servers and the man-in-the-middle attack they enable.' },
-    { t: 'Renew a local PC one final time to prove the security did not break the legitimate flow', why: 'Hardening that breaks real traffic is just an outage. Client requests are still fine from untrusted ports — only server replies are restricted.' },
+    { t: 'PHASE 1 — Confirm all four PCs start with no address',
+      do: [
+        'Run <code>ipconfig</code> on the <b>PC1</b>, <b>PC3</b> and <b>PC4</b> tabs.',
+        'All of them are set to obtain an address automatically and none has one.',
+      ],
+      done: 'No PC shows a usable address.',
+      why: 'Four hosts asking, nothing answering. Knowing the starting point makes the effect of each later step unmistakable.' },
+
+    { t: 'PHASE 2 — Exclude the gateway address, then the rest of the low range',
+      do: [
+        'On <b>R1</b>, exclude the single address <b>10.0.1.1</b> using the one-address form.',
+        'Then exclude the range <b>10.0.1.2</b> through <b>10.0.1.9</b> using the range form.',
+      ],
+      done: 'Two excluded-address lines appear in the configuration.',
+      why: 'Two forms of the same command. Exclusions protect the addresses you assigned by hand, and on real gear you type them BEFORE creating any pool.' },
+
+    { t: 'Exclude the low range on both branch subnets too',
+      do: [
+        'On <b>R1</b>, exclude <b>10.0.2.1</b> to <b>10.0.2.9</b> and <b>10.0.3.1</b> to <b>10.0.3.9</b>.',
+        'Check the running configuration.',
+      ],
+      done: 'Four excluded ranges are listed.',
+      why: 'R1 will serve addresses for networks it is not attached to, so the same protection is needed in each of them.' },
+
+    { t: 'PHASE 3 — Build the local pool with every option',
+      do: [
+        'Create pool <b>LAN1</b> and set its network to <b>10.0.1.0 255.255.255.0</b>.',
+        'Then set <b>default-router 10.0.1.1</b>, <b>dns-server 8.8.8.8</b>, <b>domain-name netdrill.lab</b> and <b>lease 7</b>.',
+      ],
+      done: 'The pool lists five options in the running configuration.',
+      why: 'A lease carries far more than an address. Gateway, DNS, domain suffix and duration all ride in the same offer, which is why a DHCP client comes up fully working.' },
+
+    { t: 'PHASE 4 — Build the two branch pools the same way',
+      do: [
+        'Create pool <b>LAN2</b> for <b>10.0.2.0 255.255.255.0</b> with default-router <b>10.0.2.1</b> and the same DNS, domain and lease.',
+        'Create pool <b>LAN3</b> for <b>10.0.3.0 255.255.255.0</b> with default-router <b>10.0.3.1</b> and the same options.',
+      ],
+      done: 'Three pools exist on one router.',
+      why: 'One server, three subnets, two of which it is not connected to. The server picks the right pool from the address the relay stamps on the request.' },
+
+    { t: 'PHASE 5 — Lease addresses on both local PCs',
+      do: [
+        'On <b>PC1</b>: <code>ipconfig /renew</code> then <code>ipconfig /all</code> — read the gateway, DNS and domain it received.',
+        'On <b>PC2</b>: renew as well.',
+        'On <b>R1</b>: display the DHCP bindings.',
+      ],
+      done: 'Both local PCs hold addresses and the server lists two bindings.',
+      why: 'The local case works immediately because these hosts share a broadcast domain with the server.' },
+
+    { t: 'PHASE 6 — Try a branch PC and watch it fail',
+      do: [
+        'On <b>PC3</b>, run <code>ipconfig /renew</code>.',
+        'Expect no address. This failure is deliberate.',
+      ],
+      done: 'PC3 still has no address.',
+      why: 'Routers do not forward broadcasts, so PC3\'s DISCOVER dies at R2 and is never heard. Feeling this failure first is what makes the fix memorable.' },
+
+    { t: 'Add the relay on R2 and renew again',
+      do: [
+        'On <b>R2</b>, enter interface <b>G0/0</b> — the one facing PC3 — and add helper address <b>10.0.12.1</b>.',
+        'Confirm with the layer-3 interface view.',
+        'Back on <b>PC3</b>: renew, then run <code>ipconfig /all</code>.',
+      ],
+      done: 'PC3 holds an address from the LAN2 pool.',
+      why: 'The relay converts the broadcast into a unicast aimed at the server and stamps it with its own interface address, which is how R1 knows which pool to use.' },
+
+    { t: 'PHASE 7 — Repeat the relay configuration on R3',
+      do: [
+        'On <b>PC4</b>, try renewing first — it fails, exactly like PC3 did.',
+        'On <b>R3</b>, add helper address <b>10.0.13.1</b> to interface <b>G0/0</b>.',
+        'Renew <b>PC4</b> and check its full configuration.',
+      ],
+      done: 'All four PCs hold addresses.',
+      why: 'Second branch, same one-line fix. The helper always goes on the interface that HEARS the clients, never the one facing the server.' },
+
+    { t: 'PHASE 8 — Inspect the bindings and the clients in detail',
+      do: [
+        'On <b>R1</b>: display the DHCP bindings and count them.',
+        'On <b>PC1</b> and <b>PC4</b>: run <code>ipconfig /all</code> and compare the two leases.',
+      ],
+      done: 'Four bindings across three pools, and two clients with different gateways.',
+      why: 'One server, three subnets, four clients. The bindings table is the server\'s own record of who holds what and until when.' },
+
+    { t: 'PHASE 9 — Remove a pool, confirm it is gone, then rebuild it',
+      do: [
+        'On <b>R1</b>, delete pool <b>LAN3</b> and look at the running configuration.',
+        'Then rebuild it in full: network, default-router, dns-server, domain-name and lease.',
+      ],
+      done: 'The pool is back with all five options.',
+      why: 'There is no way to edit a pool back into existence — you retype it. That is a real argument for keeping configuration backups.' },
+
+    { t: 'Demonstrate the classic helper mistake',
+      do: [
+        'On <b>R3</b>, put a helper address on <b>G0/1</b> — the interface facing the server rather than the clients — and look at it.',
+        'Then remove it and confirm the correct one on <b>G0/0</b> is still there.',
+        'Renew <b>PC4</b> to prove nothing broke.',
+      ],
+      done: 'Only the client-facing interface carries a helper.',
+      why: 'No client broadcast ever arrives on the server-facing interface, so a helper there accomplishes precisely nothing — and it looks perfectly reasonable in a configuration.' },
+
+    { t: 'PHASE 10 — Secure the access layer with DHCP snooping',
+      do: [
+        'On <b>SW1</b>: enable <b>service dhcp</b> and DHCP snooping globally, then look at the status.',
+        'Scope snooping to <b>VLAN 1</b> and look again.',
+        'Trust interface <b>G0/1</b>, the uplink toward R1.',
+      ],
+      done: 'Snooping is enabled, scoped, and only the uplink is trusted.',
+      why: 'Enabled but unscoped inspects nothing; scoped but untrusted-everywhere drops your own server. Both halves are needed, which is why the exam loves this pair.' },
+
+    { t: 'Prove the security did not break the legitimate flow',
+      do: [
+        'Renew <b>PC1</b> and <b>PC2</b> once more.',
+        'On <b>SW1</b>, switch snooping off and straight back on (remembering the VLAN line), then check the status.',
+        'Finally display the bindings on <b>R1</b> and save all four devices.',
+      ],
+      done: 'Both PCs renew and all four devices are saved.',
+      why: 'Client requests are permitted from untrusted ports; only server replies are restricted. Security that breaks the service gets switched off by Monday.' },
   ],
   steps: [
     /* ---- PHASE 1: baseline ---- */
@@ -416,20 +720,127 @@ L({
   },
   intro: `<b>The situation:</b> two switches and a router that can only be configured from a console cable, with every port live and willing to accept whatever somebody plugs in.<br><b>Your goal:</b> lock all three down completely. You will build the full SSH stack <b>three separate times</b> — deliberately triggering the prerequisite errors first so you understand why the order matters — restrict who may even attempt to connect, then pin six desk ports to the devices that belong on them, drilling all three violation reactions and both ways of specifying a permitted MAC address.`,
   tasks: [
-    { t: 'PHASE 1 — On SW1, deliberately try to generate RSA keys before setting a domain name, and read the refusal', why: 'The key is named hostname.domain, so IOS cannot build one until both exist. Meeting the error on purpose is how the ordering sticks.' },
-    { t: 'Try to force SSH version 2 before any keys exist, and read that refusal too', why: 'Version 2 requires keys of at least 768 bits. Two errors, two prerequisites, both discovered before they bite you in an exam.' },
-    { t: 'PHASE 2 — Now build the stack in the right order: hostname, SVI, gateway, domain, 2048-bit keys, version 2, user, vty lines', why: 'Eight steps that each depend on the one before. This is the sequence to be able to produce from memory.' },
-    { t: 'Add a management access list and attach it to the vty lines with access-class, plus an idle timeout', why: 'Defence in depth: encryption, then authentication, then a restriction on which source addresses may even try.' },
-    { t: 'PHASE 3 — Build the identical SSH stack on SW2 with its own addressing', why: 'Second device, same eight steps. The repetition is the point of this lab.' },
-    { t: 'PHASE 4 — Build it a third time on R1, noting what differs on a router', why: 'A router needs no SVI — it has real routed interfaces. Everything else is word for word identical.' },
-    { t: 'PHASE 5 — On SW1 F0/1: static access port, port security, maximum 2, sticky learning, default violation mode', why: 'Order matters — port security is rejected on a port still in dynamic mode. A maximum of 2 suits a desk phone with a PC behind it.' },
-    { t: 'On SW1 F0/2: maximum 1 with violation mode restrict', why: 'Restrict drops the offending frames and logs and counts each one, but leaves the port up. The default, shutdown, disables it entirely.' },
-    { t: 'On SW1 F0/3: violation mode protect with a manually typed MAC address', why: 'Protect drops silently — no log, no counter — which is why it is the trick answer in exam questions. A static MAC is the alternative to sticky learning.' },
-    { t: 'PHASE 6 — Repeat port security on SW2\'s ports with different values', why: 'Three more secured ports on a second switch. Six in total across the lab.' },
-    { t: 'PHASE 7 — Generate traffic so the sticky ports learn, then find the learned addresses in the running configuration', why: 'Sticky learning writes the address into the config as though you had typed it. Save the config and the binding survives a reboot.' },
-    { t: 'PHASE 8 — Shut down every unused port on both switches', why: 'Port security governs who may use a live port; disabling unused ports removes the opportunity altogether.' },
-    { t: 'PHASE 9 — Remove port security from one port entirely, then put it back', why: 'The "no" form, and a reminder that disabling security is a single command anyone with access can type.' },
-    { t: 'PHASE 10 — Sweep the verification commands on all three devices', why: 'show ip ssh for the management plane, show port-security for the access layer, plus the per-interface detail view.' },
+    { t: 'PHASE 1 — Try to generate keys before setting a domain name, and read the refusal',
+      do: [
+        'On <b>SW1</b>, in global configuration mode, try to generate RSA keys with modulus <b>2048</b> straight away.',
+        'Read the error carefully. This failure is deliberate.',
+      ],
+      done: 'IOS refuses to generate the key.',
+      why: 'The key is named hostname.domain, so neither can be missing. Meeting the refusal on purpose is how the prerequisite order stops being something you memorise.' },
+
+    { t: 'Try to force SSH version 2 before any keys exist',
+      do: [
+        'Still on <b>SW1</b>, try to set the SSH version to <b>2</b>.',
+        'Read that refusal too.',
+      ],
+      done: 'IOS rejects the command.',
+      why: 'Version 2 needs a key of at least 768 bits to exist first. Two refusals, two prerequisites — and now the correct order will be obvious.' },
+
+    { t: 'PHASE 2 — Build the whole stack in the right order',
+      do: [
+        'Set the hostname to <b>SW1</b>.',
+        'Create <b>interface Vlan 1</b> with <b>192.168.1.2 255.255.255.0</b> and enable it.',
+        'Set the default gateway to <b>192.168.1.1</b>.',
+        'Set the domain name to <b>netdrill.lab</b>, then generate <b>2048</b>-bit RSA keys.',
+        'Set SSH version <b>2</b> and create <b>username admin</b> with secret <b>Str0ngPass</b>.',
+        'On the <b>vty lines 0 4</b>: <b>login local</b>, <b>transport input ssh</b>, exec-timeout <b>5 0</b>.',
+      ],
+      done: '<code>show ip ssh</code> reports SSH enabled at version 2.',
+      why: 'Eight steps in a fixed order, each depending on the last. This block is worth being able to type without thinking, because it is the first thing done to every new device.' },
+
+    { t: 'Restrict who may even attempt to log in',
+      do: [
+        'Create a named standard list <b>MGMT-ONLY</b> permitting <b>192.168.1.0 0.0.0.255</b>.',
+        'Attach it to the <b>vty lines</b> with <b>access-class MGMT-ONLY in</b>.',
+        'Confirm with <code>show ip ssh</code> and the running configuration.',
+      ],
+      done: 'The access-class line appears under line vty 0 4.',
+      why: 'SSH proves who you are; access-class decides who may even knock. Together with the idle timeout, that is the complete management hardening for a switch.' },
+
+    { t: 'PHASE 3 — Build the identical stack on SW2',
+      do: [
+        'On <b>SW2</b>, type the whole block again with its own addressing: SVI <b>192.168.2.2/24</b>, gateway <b>192.168.2.1</b>.',
+        'Its <b>MGMT-ONLY</b> list permits <b>192.168.2.0 0.0.0.255</b> and <b>192.168.1.0 0.0.0.255</b>.',
+      ],
+      done: 'SW2 also reports SSH enabled at version 2.',
+      why: 'Second time through, from memory if you can. Note the second permit line: the management network on the other site must also be allowed in.' },
+
+    { t: 'PHASE 4 — Build it a third time on a router',
+      do: [
+        'On <b>R1</b>, set the domain name (try the newer <b>ip domain name</b> spelling), generate keys, set version 2, create the admin user.',
+        'Configure the vty lines the same way and attach a <b>MGMT-ONLY</b> list permitting <b>192.168.1.0 0.0.0.255</b>.',
+        'Note what is missing compared with the switches.',
+      ],
+      done: 'R1 reports SSH enabled and you can name the two steps a router does not need.',
+      why: 'No SVI and no default gateway — a router already has routed interfaces and its own routing table. Everything else is word for word identical.' },
+
+    { t: 'PHASE 5 — Meet the port-security ordering rule the hard way',
+      do: [
+        'On <b>SW1</b>, enter interface <b>F0/1</b> and try to enable port security immediately. Read the rejection.',
+        'Now set the port to <b>access</b> mode in VLAN <b>1</b>, then enable port security.',
+        'Set the maximum to <b>2</b> and enable <b>sticky</b> learning, leaving the violation mode at its default.',
+      ],
+      done: 'F0/1 has port security with max 2 and sticky learning.',
+      why: 'Port security is refused on a port still in dynamic mode. Maximum 2 is the realistic setting for a PC behind an IP phone, and the default violation action is shutdown.' },
+
+    { t: 'Configure a second port with the restrict violation mode',
+      do: [
+        'On <b>SW1 F0/2</b>: access mode, port security, maximum <b>1</b>, violation <b>restrict</b>, sticky learning.',
+      ],
+      done: 'F0/2 shows violation mode Restrict.',
+      why: 'Restrict drops the offending frames and logs and counts each one, but leaves the port up — a gentler response than err-disabling a user\'s port.' },
+
+    { t: 'Configure a third port with protect mode and a typed MAC address',
+      do: [
+        'On <b>SW1 F0/3</b>: access mode, port security, maximum <b>1</b>, violation <b>protect</b>.',
+        'Add a static secure MAC address of <b>aaaa.bbbb.cccc</b> instead of letting the port learn one.',
+      ],
+      done: 'F0/3 shows violation mode Protect with a manually configured address.',
+      why: 'Protect drops silently — no log, no counter — which is why it is the trick answer in exam questions. A typed MAC binds the port to one specific device with no learning at all.' },
+
+    { t: 'PHASE 6 — Repeat port security on SW2 with different values',
+      do: [
+        'On <b>SW2 F0/1</b>: access mode, port security, maximum <b>3</b>, sticky learning.',
+        'On <b>SW2 F0/2</b>: port security with violation <b>restrict</b>.',
+        'On <b>SW2 F0/3</b>: port security with violation <b>protect</b> and static MAC <b>dddd.eeee.ffff</b>.',
+      ],
+      done: 'Three more secured ports with three different policies.',
+      why: 'Six secured ports across two switches, covering every combination of maximum, violation mode and learning style that the exam can ask about.' },
+
+    { t: 'PHASE 7 — Generate traffic so the sticky ports learn',
+      do: [
+        'From <b>PC1</b>: <code>ipconfig</code>, then ping <b>192.168.1.11</b> and <b>192.168.1.1</b>.',
+        'From <b>PC3</b>: <code>ipconfig</code> and ping <b>192.168.2.1</b>.',
+        'On <b>SW1</b> and <b>SW2</b>, display the running configuration and find the sticky MAC addresses that were written in.',
+      ],
+      done: 'Sticky address lines appear under the secured interfaces.',
+      why: 'Sticky learning needs a frame to learn from. Once learned, the address becomes a configuration line — save the config and the binding survives a reboot.' },
+
+    { t: 'PHASE 8 — Shut down every unused port on both switches',
+      do: [
+        'On <b>SW1</b>, select <b>F0/4 - 6</b> as a range, describe them <b>UNUSED</b> and disable them.',
+        'On <b>SW2</b>, do the same for <b>F0/4</b>.',
+        'Check the interface status on both.',
+      ],
+      done: 'The unused ports read "disabled".',
+      why: 'Port security protects the ports in use; disabling covers the ones that are not. Together they close both halves of the physical attack surface.' },
+
+    { t: 'PHASE 9 — Remove port security from one port, then put it back',
+      do: [
+        'On <b>SW1 F0/3</b>, remove port security entirely with the "no" form and look at the port-security summary.',
+        'Then rebuild it: port security, maximum 1, violation protect, static MAC <b>aaaa.bbbb.cccc</b>.',
+      ],
+      done: 'F0/3 is protected again with the same settings.',
+      why: 'The bare "no" form removes the whole feature from the port, taking every sub-setting with it. Knowing that saves you removing five lines one at a time.' },
+
+    { t: 'PHASE 10 — Sweep the verification commands on all three devices',
+      do: [
+        'On <b>SW1</b>: the port-security summary, then the detail for <b>F0/1</b> and <b>F0/2</b>, then <code>show ip ssh</code>, then save.',
+        'On <b>SW2</b>: the summary, the detail for F0/1, <code>show ip ssh</code>, and save.',
+        'On <b>R1</b>: <code>show ip ssh</code> and save.',
+      ],
+      done: 'All three devices verified and saved.',
+      why: 'The summary answers "which ports are protected and has anything tripped?"; the per-port detail answers "what is this one port doing right now?" — including spotting a Secure-shutdown state.' },
   ],
   steps: [
     /* ---- PHASE 1: prerequisite errors ---- */
@@ -549,21 +960,131 @@ L({
   },
   intro: `<b>The situation:</b> five devices where nothing agrees on the time, every log message exists only on the box that produced it, and you have no diagram of what is cabled to what.<br><b>Your goal:</b> the three services that make a network operable rather than merely functional. Build an NTP hierarchy — one master and a <b>chain</b> of clients — send logs centrally with the severity filter tuned, and map the whole topology with the discovery protocols before deliberately switching them off again, because the information they hand you helps an intruder just as much as it helps you.`,
   tasks: [
-    { t: 'PHASE 1 — Check the clock synchronisation state on all three routers before configuring anything', why: 'Stratum 16 means "I have no trustworthy time source". That is where every unconfigured device starts.' },
-    { t: 'PHASE 2 — Make R1 an authoritative time source at stratum 3', why: 'Someone must be the reference. Stratum counts hops from a real clock — 1 is a GPS or atomic source — so a device claiming 3 puts its clients at 4.' },
-    { t: 'Point R2 at R1, then point R3 at R2, building a chain rather than a star', why: 'Each hop away adds a stratum. A chain shows how the hierarchy actually propagates, rather than everyone talking to one server.' },
-    { t: 'Inspect all three with show ntp status, show ntp associations and show clock', why: 'Status shows whether you are synchronised and to what; associations lists every configured source; a leading asterisk on the clock means the time is NOT authoritative.' },
-    { t: 'PHASE 3 — On R1, send logs to the syslog server and set the trap level to warnings', why: 'Logs kept only on a device vanish with it. The severity filter stops routine chatter flooding the server.' },
-    { t: 'Experiment with the severity level: try errors, then debugging, then settle on warnings', why: 'Three different levels typed on one router. Seeing them change in show logging makes the 0-7 scale concrete rather than a list to memorise.' },
-    { t: 'Add a local logging buffer and turn console logging off', why: 'The buffer gives you recent history with no server round-trip. Disabling console logging stops messages interrupting you mid-command — the blunt alternative to logging synchronous.' },
-    { t: 'PHASE 4 — Repeat the whole logging configuration on R2 and on SW1', why: 'Three devices logging to one server is the minimum realistic deployment. Repetition on a switch shows the commands are identical there.' },
-    { t: 'PHASE 5 — Generate a real log message by bouncing an interface, then decode its format', why: '%LINK-5-CHANGED is facility LINK, severity 5, mnemonic CHANGED. Reading that structure is a guaranteed exam skill.' },
-    { t: 'PHASE 6 — Map the whole network with CDP from three different vantage points', why: 'Summary gives you the topology; detail adds IP addresses and platform strings. Cross-checking from several devices builds a habit worth having.' },
-    { t: 'PHASE 7 — Disable CDP on one link only, leaving it running elsewhere', why: 'The per-interface form silences an untrusted edge without losing visibility inside your own network.' },
-    { t: 'Then disable CDP device-wide on another router, and confirm the difference between the two commands', why: '"no cdp run" is global; "no cdp enable" is per interface. The exam tests that you know which is which.' },
-    { t: 'Re-enable CDP on the interface you silenced, to practise the positive form', why: 'Every command has both directions. Typing cdp enable once makes the pair symmetrical in your memory.' },
-    { t: 'PHASE 8 — Enable LLDP on every device and confirm the neighbours reappear', why: 'LLDP is the vendor-neutral equivalent and, unlike CDP, is OFF by default on Cisco gear — so every device needs the command.' },
-    { t: 'PHASE 9 — Sweep every verification command across the whole network', why: 'NTP status, logging configuration, CDP and LLDP neighbours. These are the commands you run on a device you have never seen before.' },
+    { t: 'PHASE 1 — Check the clock state on all three routers before configuring anything',
+      do: [
+        'On <b>R1</b>: enter privileged EXEC, set <b>terminal length 0</b>, then display the NTP status and the clock.',
+        'On <b>R2</b> and <b>R3</b>: display the NTP status as well.',
+        'Note the stratum each reports.',
+      ],
+      done: 'All three report stratum 16 and "unsynchronized".',
+      why: 'Stratum 16 means "I have no trustworthy time source". Three routers with three unreliable clocks means their logs cannot be correlated at all.' },
+
+    { t: 'PHASE 2 — Make R1 the authoritative time source at stratum 3',
+      do: [
+        'On <b>R1</b>, configure it as an NTP <b>master</b> with stratum <b>3</b>.',
+        'Display the NTP status again and compare with what you saw a moment ago.',
+      ],
+      done: 'R1 reports itself synchronised at stratum 3.',
+      why: 'Somebody must be the reference. Stratum 3 is an arbitrary but sensible claim for a lab; production would point at a public pool or a GPS appliance instead.' },
+
+    { t: 'Build a chain of clients rather than a star',
+      do: [
+        'On <b>R2</b>, configure NTP server <b>10.0.12.1</b> (R1), then display the status and the associations.',
+        'On <b>R3</b>, configure NTP server <b>10.0.23.1</b> (R2), then display the status and associations.',
+      ],
+      done: 'R2 sits one stratum below R1, and R3 one below R2.',
+      why: 'Each hop away from the reference adds a stratum. A chain makes the hierarchy visible in a way that everyone pointing at one server does not.' },
+
+    { t: 'Inspect the result across the chain',
+      do: [
+        'On <b>R1</b>: display the NTP status and the clock — note the absence of a leading asterisk now.',
+        'On <b>R3</b>: display the clock and compare it with R1\'s.',
+      ],
+      done: 'All three routers agree on the time.',
+      why: 'A leading asterisk means the time is NOT authoritative. With it gone, log timestamps from different devices can finally be compared against each other.' },
+
+    { t: 'PHASE 3 — Send R1\'s logs to the syslog server',
+      do: [
+        'On <b>R1</b>, first display the logging configuration to see the starting state.',
+        'Then configure logging host <b>10.0.0.100</b> and look again.',
+      ],
+      done: 'The server address appears in the logging output.',
+      why: 'Logs kept only on a device vanish with it — which matters most exactly when the device dies or is compromised. Syslog travels over UDP port 514.' },
+
+    { t: 'Experiment with three different severity levels',
+      do: [
+        'On <b>R1</b>, set the trap level to <b>errors</b> and look at the logging output.',
+        'Then set it to <b>debugging</b> and look again.',
+        'Finally settle on <b>warnings</b>.',
+      ],
+      done: 'The trap level ends as warnings.',
+      why: 'Errors is level 3 — quiet, but you would miss link flaps. Debugging is level 7 — everything, which is overwhelming as a permanent setting. Warnings is level 4 and is the sensible production value.' },
+
+    { t: 'Add a local buffer and silence the console',
+      do: [
+        'On <b>R1</b>, configure buffered logging at <b>16384</b> bytes and disable console logging.',
+        'Display the logging configuration and read the level of each destination separately.',
+      ],
+      done: 'Buffer, host and console each show their own state.',
+      why: 'Destinations are independent. The buffer gives you instant recent history with no server round trip, and disabling console logging stops messages interrupting you mid-command.' },
+
+    { t: 'PHASE 4 — Repeat the logging configuration on R2 and SW1',
+      do: [
+        'On <b>R2</b>: logging host <b>10.0.0.100</b>, trap <b>warnings</b>, buffered <b>16384</b>, console logging off.',
+        'On <b>SW1</b>: the same host, trap level and buffer.',
+      ],
+      done: 'Three devices log centrally at the same level.',
+      why: 'Four lines, identical on every device. Consistency is what makes central logging useful — and nothing about syslog is router-specific.' },
+
+    { t: 'PHASE 5 — Generate a real log message and decode it',
+      do: [
+        'On <b>R2</b>, bounce interface <b>G0/2</b>: disable it, then enable it again.',
+        'Display the logging buffer and find the message.',
+        'Break <code>%LINK-5-CHANGED</code> into facility, severity and mnemonic.',
+      ],
+      done: 'You can name all three parts of the message.',
+      why: 'Severity 5 falls below the warnings trap level, so only the local buffer kept it — that is the filter doing exactly what you configured.' },
+
+    { t: 'PHASE 6 — Map the whole network with CDP from three vantage points',
+      do: [
+        'On <b>R1</b>: display CDP status, the neighbour summary, and then the detailed view.',
+        'On <b>R2</b>: display the neighbour summary — it should list three neighbours.',
+        'On <b>SW1</b>: display the summary as well.',
+      ],
+      done: 'Between the three views you have the whole topology.',
+      why: 'Summary gives you the map; detail adds IP addresses and platform strings. Remember "Local Intrfce" is your port and "Port ID" is theirs — getting that backwards is a classic exam mistake.' },
+
+    { t: 'PHASE 7 — Disable CDP on one link only',
+      do: [
+        'On <b>R2</b>, enter interface <b>G0/1</b> and disable CDP on that interface alone.',
+        'Display the neighbour summary and see which neighbour disappeared.',
+      ],
+      done: 'R3 is gone while R1 and SW2 remain.',
+      why: 'This is the surgical, per-interface form — the one you use to silence an untrusted edge without losing visibility inside your own network.' },
+
+    { t: 'Then disable CDP device-wide on another router',
+      do: [
+        'On <b>R3</b>, disable CDP globally and display the CDP status.',
+      ],
+      done: 'R3 reports CDP is not enabled at all.',
+      why: '"no cdp run" is global and stops the device speaking CDP on every port at once. Knowing which command is which is examined directly.' },
+
+    { t: 'Re-enable CDP on the interface you silenced',
+      do: [
+        'On <b>R2 G0/1</b>, enable CDP again with the positive form, then display the neighbour summary.',
+        'Note that R3 still does not appear.',
+      ],
+      done: 'R2\'s interface speaks CDP again but R3 is still invisible.',
+      why: 'Both ends must run the protocol for a neighbour to appear. R3 is silent globally, so re-enabling one interface on R2 changes nothing — a genuinely useful diagnostic insight.' },
+
+    { t: 'PHASE 8 — Enable LLDP on all five devices',
+      do: [
+        'Enable LLDP on <b>R1</b>, <b>R2</b>, <b>R3</b>, <b>SW1</b> and <b>SW2</b>.',
+        'On <b>SW2</b>, also switch it off and back on again to drill the "no" form.',
+        'Then on <b>R2</b>, display the LLDP neighbours and the CDP neighbours side by side.',
+      ],
+      done: 'LLDP shows R3 even though CDP does not.',
+      why: 'LLDP is IEEE 802.1AB and is OFF by default on Cisco gear — the reverse of CDP. You have deliberately created an asymmetry: the same topology visible over one protocol and invisible over the other.' },
+
+    { t: 'PHASE 9 — Sweep every verification command across the network',
+      do: [
+        'On <b>R1</b>: NTP status, NTP associations, logging, CDP neighbours, LLDP neighbours — then save.',
+        'On <b>R2</b>: NTP status, logging, both neighbour views — then save.',
+        'On <b>R3</b>: NTP status, clock, LLDP neighbours — then save.',
+        'On <b>SW1</b> and <b>SW2</b>: logging and LLDP where relevant, then save both.',
+      ],
+      done: 'All five devices verified and saved.',
+      why: 'These are exactly the commands you run on a device you have never seen before: what time does it think it is, where do its logs go, and what is it plugged into?' },
   ],
   steps: [
     /* ---- PHASE 1: baseline ---- */
@@ -738,24 +1259,156 @@ L({
   },
   intro: `<b>The situation:</b> a network that used to work. Two user VLANs behind a pair of switches, a router-on-a-stick gateway, a WAN link to a second router, and a server on the far side. Somebody spent a weekend "tidying up" and now almost nothing reaches anything. There is no documentation and nobody is admitting to anything.<br><b>Your goal:</b> find and repair <b>eleven separate faults</b> using nothing but show commands and reasoning. They run the full stack — a port in the wrong VLAN, a trunk that filters one out, a VLAN missing from a switch entirely, a port sitting err-disabled, a gateway addressed wrongly, a subinterface tagged for the wrong VLAN, a disabled interface, a /30 mismatch, a route to a next hop that does not exist, missing return routes, and a forgotten access list.<br><b>The method matters more than the answers:</b> work bottom-up and near-to-far, change one thing at a time, and re-test after every fix. Each fault has a fingerprint, and by the end of this lab you should recognise all eleven on sight.`,
   tasks: [
-    { t: 'PHASE 1 — Reproduce the problem from all three PCs before touching a single configuration line', why: 'Symptoms are data. Three hosts failing in three different ways narrows the search far faster than one ping does.' },
-    { t: 'Record exactly which pings fail and which succeed, including each PC to its own gateway', why: 'If the nearest hop fails, nothing beyond it matters yet. That single test tells you whether to look at the switch or the router first.' },
-    { t: 'PHASE 2 — FAULT 1: on SW1, find the access port sitting in the wrong VLAN and move it back', why: 'Two ports in different VLANs are in different broadcast domains, however perfect the addressing is. show vlan brief exposes it in one screen.' },
-    { t: 'FAULT 2: inspect SW1\'s trunk and add the VLAN that is missing from its allowed list', why: 'A trunk carries only the VLANs on its allowed list. One VLAN silently absent is a classic — and show interfaces trunk is the only place it shows.' },
-    { t: 'PHASE 3 — FAULT 3: on SW2, discover that one VLAN was never created and create it', why: 'A switch drops frames for a VLAN it does not have in its database, even when the trunk allows it. Two separate conditions, two separate checks.' },
-    { t: 'FAULT 4: find the err-disabled port on SW2, read why it shut itself down, and recover it', why: 'err-disabled is not the same as "administratively down". A port-security violation put it there and only shutdown / no shutdown brings it back.' },
-    { t: 'Raise the port-security limit so the recovered port can hold the addresses it legitimately sees', why: 'Recovering a port without fixing the cause means it err-disables again the next time. Fix the condition, not just the symptom.' },
-    { t: 'PHASE 4 — FAULT 5: on R1, compare each subinterface address with the gateway the PCs are configured to use', why: 'A gateway address the hosts never ask for is invisible in every routing check — the router looks perfectly healthy while nothing can leave the VLAN.' },
-    { t: 'FAULT 6: check the dot1Q tag on each subinterface against the VLAN it is supposed to serve', why: 'Router-on-a-stick has two halves: the tag must match the VLAN and the address must match the subnet. Getting the tag wrong breaks one VLAN and nothing else.' },
-    { t: 'Re-test from both PCs and confirm that each one can now reach its own gateway', why: 'Gateways first. There is no point chasing the WAN while the first hop still fails.' },
-    { t: 'PHASE 5 — FAULT 7: find and enable the interface on R1 that is administratively down', why: '"administratively down" has exactly one cause: somebody typed shutdown, or never typed no shutdown.' },
-    { t: 'FAULT 8: compare both ends of the WAN link and correct the address that is outside the /30', why: 'Both ends of a /30 must share that four-address subnet. 10.0.12.1 and 10.0.12.5 are in adjacent but separate networks and can never speak.' },
-    { t: 'Prove the two routers can ping each other before you go anywhere near routing', why: 'Routing cannot work across a link whose two ends cannot reach each other. Foundations first, every time.' },
-    { t: 'PHASE 6 — FAULT 9: read R1\'s routing table and correct the static route whose next hop does not exist', why: 'A route pointing at an address nobody owns still appears in the table looking entirely plausible. Always check the next hop is reachable.' },
-    { t: 'FAULT 10: check R2\'s table and add the return routes for both user VLANs', why: 'Traffic needs a path there AND back. Missing return routes are the single most common static-routing mistake.' },
-    { t: 'PHASE 7 — FAULT 11: ping the server, notice ICMP alone is failing, and find the access list responsible', why: 'One protocol failing while everything else works is the fingerprint of a filter. show ip interface names the list and the direction.' },
-    { t: 'PHASE 8 — Verify the repaired network end to end from every host, in both directions', why: 'A fix that works one way is not a fix. Test every host to every destination, then trace the path to confirm it goes where you expect.' },
-    { t: 'Sweep the five show commands that diagnose almost everything, then save every device', why: 'Interface brief, vlan brief, interfaces trunk, ip route and ip interface. Those five find the overwhelming majority of CCNA-level faults — including all eleven here.' },
+    { t: 'PHASE 1 — Reproduce the problem from all three PCs before touching anything',
+      do: [
+        'From <b>PC1</b>: <code>ipconfig</code>, then ping its gateway <b>10.0.10.1</b>, then the server <b>10.0.30.100</b>.',
+        'From <b>PC2</b>: <code>ipconfig</code>, then ping <b>10.0.20.1</b> and <b>10.0.30.100</b>.',
+        'From <b>PC3</b>: <code>ipconfig</code>, then ping <b>10.0.20.1</b>.',
+        'Write down which of those succeed and which fail.',
+      ],
+      done: 'You have a written list of symptoms before any change is made.',
+      why: 'Symptoms are data. Three hosts failing in three different ways narrows the search far faster than one ping does — and you cannot prove a repair without a baseline.' },
+
+    { t: 'Test a path that involves no router at all',
+      do: [
+        'From <b>PC2</b>, ping <b>10.0.20.11</b> — that is PC3, in the same VLAN and the same subnet, on the other switch.',
+      ],
+      done: 'The ping fails.',
+      why: 'That test uses pure layer 2 across the trunk. Failing here proves at least one fault lives in the switching path, before you waste time on routers.' },
+
+    { t: 'PHASE 2 — FAULT 1: find the access port in the wrong VLAN on SW1',
+      do: [
+        'On <b>SW1</b>, enter privileged EXEC, set terminal length 0 and display the VLAN table and the interface status.',
+        'Compare the VLAN of <b>F0/1</b> (PC1) with the VLAN of the other ports, and confirm it on the interface itself with the per-port switchport view.',
+        'Then put <b>F0/1</b> back into VLAN <b>10</b> and verify.',
+      ],
+      done: 'Fa0/1 appears under VLAN 10 in the VLAN table.',
+      why: 'Two ports in different VLANs cannot talk however perfect the addressing is. The VLAN table exposes it in one screen — always the first check at layer 2.' },
+
+    { t: 'FAULT 2: find the VLAN missing from SW1\'s trunk allowed list',
+      do: [
+        'On <b>SW1</b>, display the trunk status and read the allowed VLAN list on <b>G0/1</b>.',
+        'Add the missing VLAN with the <b>add</b> form, then verify.',
+        'Re-test from <b>PC2</b> to <b>10.0.20.11</b> — still failing, which is expected.',
+      ],
+      done: 'The trunk allows both VLAN 10 and VLAN 20.',
+      why: 'Use <b>add</b>, never the bare form — the bare form REPLACES the list and would have cut off VLAN 10 instead. One fault fixed does not mean one fault only.' },
+
+    { t: 'PHASE 3 — FAULT 3: find the VLAN that does not exist on SW2',
+      do: [
+        'On <b>SW2</b>, display the VLAN table and compare it with SW1\'s.',
+        'Create the missing VLAN <b>20</b> and name it <b>SALES</b>.',
+      ],
+      done: 'Both switches list the same VLANs.',
+      why: 'A switch drops frames for a VLAN it has never heard of, no matter what the trunk allows. Two separate conditions must both be true — existence AND allowance.' },
+
+    { t: 'FAULT 4: find the err-disabled port and work out why',
+      do: [
+        'On <b>SW2</b>, display the interface status and find the port reading <b>err-disabled</b>.',
+        'Ask that port why: display the port-security detail for <b>F0/1</b> and read the Port Status and violation count.',
+      ],
+      done: 'You can state the reason the switch disabled the port itself.',
+      why: 'err-disabled is not the same as "administratively down" (somebody typed shutdown) or "notconnect" (nothing plugged in). The switch made this decision on its own.' },
+
+    { t: 'Fix the cause first, then recover the port',
+      do: [
+        'On <b>SW2 F0/1</b>, raise the port-security maximum to <b>2</b> so the port will not trip again.',
+        'Then recover it: <b>shutdown</b> followed by <b>no shutdown</b>.',
+        'Verify with the interface status, the port-security detail and the trunk status.',
+      ],
+      done: 'The port reads connected and Secure-up.',
+      why: 'Only a shut/no-shut clears err-disable by hand; a bare <code>no shutdown</code> does nothing at all, which catches almost everybody once. Fix the condition before recovering the symptom or it simply trips again.' },
+
+    { t: 'Confirm layer 2 is now healthy end to end',
+      do: [
+        'From <b>PC2</b>, ping <b>10.0.20.11</b> again.',
+      ],
+      done: 'Two hosts in the same VLAN on different switches can now talk.',
+      why: 'That single success proves the access VLANs, the trunk allowed lists and both VLAN databases all agree. The switching path is finished.' },
+
+    { t: 'PHASE 4 — FAULT 5: find the gateway addressed wrongly on R1',
+      do: [
+        'From <b>PC1</b>, ping <b>10.0.10.1</b> again — still failing, so the fault has moved up to layer 3.',
+        'On <b>R1</b>, display the interface summary and the running configuration, then look closely at <b>G0/0.10</b> with the layer-3 interface view.',
+        'Compare its address with the gateway the PCs are configured to use, and correct it to <b>10.0.10.1</b>.',
+        'Re-test from PC1 immediately.',
+      ],
+      done: 'PC1 reaches its gateway.',
+      why: 'The router was perfectly healthy and answering — on an address nobody was asking for. Always compare the router\'s address against the hosts\' own ipconfig output.' },
+
+    { t: 'FAULT 6: find the subinterface tagged for the wrong VLAN',
+      do: [
+        'From <b>PC2</b>, ping <b>10.0.20.1</b> — still failing, even though that subinterface has the right address.',
+        'On <b>R1</b>, read the running configuration and check the dot1Q tag on <b>G0/0.20</b>.',
+        'Correct the encapsulation to VLAN <b>20</b> and re-test from PC2 and PC3.',
+      ],
+      done: 'Both VLAN 20 hosts reach their gateway.',
+      why: 'Router-on-a-stick has two halves — the tag and the address — and the subinterface NUMBER is cosmetic. Only the encapsulation command decides which tagged frames the router accepts.' },
+
+    { t: 'PHASE 5 — FAULT 7: find the interface that is administratively down',
+      do: [
+        'From <b>PC1</b>, ping <b>10.0.30.100</b> — local works, remote does not.',
+        'On <b>R1</b>, display the interface summary and find the interface reading <b>administratively down</b>.',
+        'Enable it, verify, then ping <b>10.0.12.2</b> from R1 — it still fails.',
+      ],
+      done: 'The WAN interface is up but the far end does not answer.',
+      why: '"administratively down" has exactly one cause: somebody typed shutdown. Up/up means the cable and protocol are fine — it says nothing about the addressing.' },
+
+    { t: 'FAULT 8: find the /30 mismatch across the WAN link',
+      do: [
+        'On <b>R1</b>, read the layer-3 detail of <b>G0/1</b> and work out which addresses its /30 actually covers.',
+        'On <b>R2</b>, display the interface summary and the CDP neighbours — the cable is right, the address is not.',
+        'Correct <b>R2 G0/0</b> to <b>10.0.12.2 255.255.255.252</b> and ping across from both sides.',
+      ],
+      done: 'The two routers reach each other.',
+      why: 'With a /30 the usable pairs are .1/.2, then .5/.6. 10.0.12.1 and 10.0.12.5 are numerically adjacent and in different networks — never accept a link as working from one side only.' },
+
+    { t: 'PHASE 6 — FAULT 9: find the route pointing at a next hop nobody owns',
+      do: [
+        'On <b>R1</b>, display the routing table and look at the static route to <b>10.0.30.0/24</b>.',
+        'Check whether its next hop is inside the /30 you just repaired.',
+        'Remove the bad route, add one via <b>10.0.12.2</b>, then verify and try pinging the server from R1.',
+      ],
+      done: 'The route is corrected but the ping from R1 still fails.',
+      why: 'Remove first, then add. Leaving both in place would give two routes of equal length and equal AD, and the router would load-balance half your traffic into a black hole.' },
+
+    { t: 'FAULT 10: find the missing return routes on R2',
+      do: [
+        'On <b>R2</b>, display the routing table — it knows only its two connected subnets.',
+        'Add routes for <b>10.0.10.0/24</b> and <b>10.0.20.0/24</b>, both via <b>10.0.12.1</b>.',
+        'Verify, then ping the server from <b>R1</b> again.',
+      ],
+      done: 'R1 reaches the server.',
+      why: 'Traffic needs a path there AND back. A single summary — 10.0.0.0/16 via 10.0.12.1 — would also work and is what you would write in production.' },
+
+    { t: 'PHASE 7 — FAULT 11: find the access list eating ICMP',
+      do: [
+        'From <b>PC1</b>, ping <b>10.0.30.100</b> — routing is complete and it still fails.',
+        'On <b>R2</b>, display the layer-3 view of <b>G0/1</b> and the access lists.',
+        'Detach the offending list from the interface and confirm the interface is clean.',
+      ],
+      done: 'No access list is applied to the server LAN interface.',
+      why: 'When the path exists and traffic still dies, suspect a filter. One protocol failing while others work is the fingerprint of an ACL — and detaching is enough, the list can stay defined.' },
+
+    { t: 'PHASE 8 — Verify the repaired network from every host, in both directions',
+      do: [
+        'From <b>PC1</b>: ping <b>10.0.30.100</b> and trace the route to it.',
+        'From <b>PC2</b>: ping its gateway, then <b>10.0.10.10</b>, then the server.',
+        'From <b>PC3</b>: ping the server and trace the route.',
+        'From <b>SRV</b>: ping all three hosts.',
+      ],
+      done: 'Every host reaches every other host, in both directions.',
+      why: 'A fix that works one way is not a fix. PC3\'s traffic in particular crosses the recovered err-disabled port, both trunks, the ROAS gateway and the WAN — the longest path in the network.' },
+
+    { t: 'Sweep the diagnostic commands and save every device',
+      do: [
+        'On <b>SW1</b>: VLAN table, trunk status, interface status — then save.',
+        'On <b>SW2</b>: VLAN table, trunk status, port-security summary — then save.',
+        'On <b>R1</b>: interface summary, routing table, the layer-3 view of a subinterface — then save.',
+        'On <b>R2</b>: interface summary, routing table, access lists — then save.',
+      ],
+      done: 'All four devices are verified and saved.',
+      why: 'Those five commands — interface brief, vlan brief, interfaces trunk, ip route and ip interface — diagnose the overwhelming majority of CCNA-level faults, including all eleven in this lab. Run it again from scratch and time yourself.' },
   ],
   steps: [
     /* ---- PHASE 1: gather symptoms ---- */
