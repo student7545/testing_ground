@@ -22,6 +22,20 @@ L({
     topo.devs.R1.hostname = 'R1';
   },
   intro: `<b>The situation:</b> a router connects three networks — PC1's, PC2's, and one holding a server. Right now both PCs can reach the server freely.<br><b>Your goal:</b> enforce a policy: only PC1's network may reach the server; PC2's network must be blocked. You'll do it with a <b>standard access list</b> — a simple filter that judges traffic purely on where it came FROM. Because it can't see where traffic is going, <em>where</em> you apply it matters as much as what you write.`,
+  spec: [
+    { t: 'Policy to enforce', r: [
+      'Hosts on <b>10.0.1.0/24</b> may reach the server at <b>10.0.3.100</b>.',
+      'Hosts on <b>10.0.2.0/24</b> must be blocked from reaching it.',
+      'Everything else must keep working.',
+    ] },
+    { d: 'R1', r: [
+      'Use a <b>numbered standard</b> access list, number <b>10</b>.',
+      'Apply it on the interface and in the direction that a standard list belongs on — think about what a standard list can and cannot match.',
+    ] },
+    { t: 'Verification', r: [
+      '<b>PC1</b> still reaches 10.0.3.100; <b>PC2</b> does not.',
+    ] },
+  ],
   tasks: [
     { t: 'Record the "before" picture from both PCs',
       do: [
@@ -124,6 +138,20 @@ L({
     topo.devs.R1.hostname = 'R1';
   },
   intro: `<b>The situation:</b> the same kind of setup as the last lab, but the policy is now more specific: PC1's network should be able to <em>browse</em> the web server, but not <em>ping</em> it.<br><b>Your goal:</b> write an <b>extended access list</b>. Unlike the standard kind, it can see the protocol, the destination and the port number — so it can allow web traffic and block ping between the very same two machines. That precision also changes where you should apply it.`,
+  spec: [
+    { t: 'Policy to enforce', r: [
+      'Hosts on <b>10.0.1.0/24</b> may browse the web server <b>10.0.3.100</b> on <b>TCP 80</b>.',
+      'Those same hosts must <b>not</b> be able to ping that server.',
+      'All other traffic must be unaffected.',
+    ] },
+    { d: 'R1', r: [
+      'Use a <b>named extended</b> access list called <b>WEB-ONLY</b>, with exactly three entries in the right order.',
+      'Apply it on the interface and in the direction an extended list belongs — as close to the source as you can get.',
+    ] },
+    { t: 'Verification', r: [
+      'A ping from PC1 to the server fails, while TCP 80 to the same server would be permitted.',
+    ] },
+  ],
   tasks: [
     { t: 'On R1, start a named extended access list called WEB-ONLY',
       do: [
@@ -214,6 +242,21 @@ L({
   layout: { R1: [70, 45], SW1: [200, 45], SW2: [330, 45] },
   setupAll: topo => { const i = ND.getIface(topo.devs.R1, 'g0/0'); i.shutdown = false; },
   intro: `<b>The situation:</b> a router and two switches are cabled together, but you don't have a diagram — you have to work out what's connected to what.<br><b>Your goal:</b> use the discovery protocols that Cisco devices use to announce themselves to their neighbours. First map the network with <b>CDP</b> (Cisco's own), then switch it off on the router and turn on <b>LLDP</b> (the vendor-neutral equivalent) instead. The same information that helps you also helps an intruder, which is why you learn to control it.`,
+  spec: [
+    { t: 'Starting point', r: [
+      'Map the topology first using the discovery protocol that is already running, from <b>SW1</b>. Note which local port faces which neighbour.',
+    ] },
+    { d: 'R1', r: [
+      'Stop this device speaking <b>CDP</b> entirely — device-wide, not per interface.',
+      'Enable the vendor-neutral discovery protocol instead.',
+    ] },
+    { d: 'SW1 and SW2', r: [
+      'Enable the vendor-neutral discovery protocol on both as well.',
+    ] },
+    { t: 'Required end state', r: [
+      'R1 is <b>invisible</b> to CDP but <b>visible</b> over LLDP from SW1.',
+    ] },
+  ],
   tasks: [
     { t: 'On SW1, list the neighbours CDP has already discovered',
       do: [
@@ -314,6 +357,18 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.R2.hostname = 'R2';
   },
   intro: `<b>The situation:</b> two routers whose clocks are not synchronised with anything. Their log messages will carry unreliable timestamps, which makes troubleshooting across devices nearly impossible.<br><b>Your goal:</b> make R2 the network's official time source, and have R1 synchronise its clock to it using <b>NTP</b>. It's a small configuration with outsized importance — correlating logs and validating certificates both depend on it.`,
+  spec: [
+    { d: 'R2', r: [
+      'Act as the network\'s authoritative time source, claiming <b>stratum 3</b>.',
+    ] },
+    { d: 'R1', r: [
+      'Synchronise its clock from <b>10.0.0.2</b>.',
+      'Must end up reporting a synchronised clock, one stratum below R2.',
+    ] },
+    { t: 'Also confirm', r: [
+      'Which source R1 is using, and whether its clock now counts as authoritative.',
+    ] },
+  ],
   tasks: [
     { t: 'On R1, look at the clock synchronisation state before configuring anything',
       do: [
@@ -400,6 +455,20 @@ L({
     topo.devs.R2.staticRoutes.push({ net: '10.0.1.0', mask: '255.255.255.0', via: '10.0.12.1', ad: 1 });
   },
   intro: `<b>The situation:</b> two PCs are set to get their IP addresses automatically, but nothing is handing addresses out, so both are offline. The routers are already addressed and routing between themselves — this lab is purely about DHCP.<br><b>Your goal:</b> turn R1 into the address server for <em>both</em> networks. The PC on R1's own network is straightforward. The PC behind R2 is the interesting case: its request is a broadcast, and routers don't forward broadcasts — so R2 needs an extra command to pass it along.`,
+  spec: [
+    { d: 'R1 (the DHCP server for BOTH LANs)', r: [
+      'Never hand out <b>10.0.1.1-10.0.1.9</b> or <b>10.0.2.1-10.0.2.9</b>.',
+      'A pool named <b>LAN1</b> serving <b>10.0.1.0/24</b>, gateway <b>10.0.1.1</b>, DNS <b>8.8.8.8</b>.',
+      'A pool named <b>LAN2</b> serving <b>10.0.2.0/24</b>, gateway <b>10.0.2.1</b>, DNS <b>8.8.8.8</b> — a network R1 is not even attached to.',
+    ] },
+    { d: 'R2', r: [
+      'PC2\'s DHCP broadcasts must reach R1. Work out which interface needs the command, and which address it points at.',
+    ] },
+    { t: 'Verification', r: [
+      'Both PCs obtain an address, a gateway and a DNS server by DHCP.',
+      'R1\'s binding table lists both leases.',
+    ] },
+  ],
   tasks: [
     { t: 'Confirm both PCs start with no address at all',
       do: [
@@ -525,6 +594,17 @@ L({
     topo.devs.R1.hostname = 'R1';
   },
   intro: `<b>The situation:</b> every time you've typed <code>no shutdown</code> in these labs, a message like <code>%LINK-5-CHANGED</code> appeared on screen. That's the logging system talking — and right now those messages exist only on the device.<br><b>Your goal:</b> send them somewhere they survive: to a logging server on the network, and to a memory buffer on the router itself. You'll also control <em>how much</em> gets sent, using the severity scale that ranks messages from emergencies down to debugging chatter.`,
+  spec: [
+    { d: 'R1', r: [
+      'Export log messages to the syslog server at <b>10.0.0.100</b>.',
+      'Export only messages of severity <b>warnings</b> and more severe.',
+      'Keep a local log buffer of <b>16384</b> bytes as well.',
+    ] },
+    { t: 'Then prove it works', r: [
+      'Generate a real message by bouncing an interface, and read it back out of the buffer.',
+      'Be able to decode <code>%LINK-5-CHANGED</code> into facility, severity and mnemonic.',
+    ] },
+  ],
   tasks: [
     { t: 'On R1, look at where log messages currently go',
       do: [
@@ -603,6 +683,20 @@ L({
   links: [['PC1', 'e0', 'SW1', 'f0/1']],
   layout: { PC1: [90, 45], SW1: [260, 45] },
   intro: `<b>The situation:</b> a switch you can only configure by standing next to it with a console cable. Nobody wants to walk to the wiring closet every time.<br><b>Your goal:</b> make it reachable over the network — securely. That means giving the switch an IP address to be reached at, then building the full <b>SSH</b> stack: a name, a domain, encryption keys, a user account, and remote-access lines that refuse the old insecure telnet. Every step depends on the one before it, which is why the order matters.`,
+  spec: [
+    { d: 'SW1', r: [
+      'Hostname <b>SW1</b>.',
+      'Reachable on the network at <b>192.168.1.2 255.255.255.0</b> — work out where a layer-2 switch keeps a management address.',
+      'Domain name <b>netdrill.lab</b>.',
+      'RSA keys with a <b>2048</b>-bit modulus.',
+      'SSH restricted to <b>version 2</b>.',
+      'A local account <b>admin</b> with the hashed secret <b>cisco123</b>.',
+      'The remote-access lines must authenticate against that local account list and accept <b>SSH only</b> — no Telnet.',
+    ] },
+    { t: 'Note', r: [
+      'These steps have a strict order. If a command is refused, work out which prerequisite is missing rather than retyping it.',
+    ] },
+  ],
   tasks: [
     { t: 'Rename the switch to SW1',
       do: [
@@ -713,6 +807,16 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.ISP.hostname = 'ISP';
   },
   intro: `<b>The situation:</b> a company server sits on a private address (192.168.1.100). Private addresses can't be used on the public internet, so nobody outside can reach it — but this server is meant to be publicly reachable.<br><b>Your goal:</b> give it a permanent public identity (203.0.113.100) using <b>static NAT</b>, which maps one private address to one public address in both directions. Outsiders connect to the public address; the router quietly rewrites it to the real one.`,
+  spec: [
+    { d: 'R1', r: [
+      'Mark <b>G0/0</b> (facing the server) and <b>G0/1</b> (facing the ISP) as the two NAT domains, the right way round.',
+      'Publish the server permanently: private <b>192.168.1.100</b> must appear on the internet as <b>203.0.113.100</b>.',
+    ] },
+    { t: 'Then check', r: [
+      'The translation exists in the table even with no traffic flowing.',
+      'You can name the inside-local and inside-global addresses of that mapping.',
+    ] },
+  ],
   tasks: [
     { t: 'Study the addressing before you change anything',
       do: [
@@ -804,6 +908,17 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.ISP.hostname = 'ISP';
   },
   intro: `<b>The situation:</b> an entire office network of private addresses needs internet access — but the company has only ONE public address to share between all of them.<br><b>Your goal:</b> configure <b>PAT</b> (also called NAT overload), which lets many devices share a single public address by tracking each conversation with a different port number. This is exactly what the router in your home does for every phone, laptop and TV in the house.`,
+  spec: [
+    { d: 'R1', r: [
+      'The whole of <b>192.168.1.0/24</b> must reach the internet through the single public address on <b>G0/1</b>.',
+      'Select those hosts with numbered access list <b>1</b>.',
+      'Mark the NAT inside and outside interfaces.',
+      'Configure the translation so that many hosts share one address at the same time.',
+    ] },
+    { t: 'Then answer', r: [
+      'Why can an outside host open a connection to a statically-mapped server, but not to a PAT-translated user?',
+    ] },
+  ],
   tasks: [
     { t: 'On R1, create ACL 1 to select which hosts may be translated',
       do: [
@@ -886,6 +1001,21 @@ L({
   links: [['PC1', 'e0', 'SW1', 'f0/1'], ['PC2', 'e0', 'SW1', 'f0/2']],
   layout: { PC1: [70, 20], PC2: [70, 90], SW1: [240, 55] },
   intro: `<b>The situation:</b> any switch port with a cable in it will accept any device someone plugs in — a visitor's laptop, a rogue wireless access point, anything.<br><b>Your goal:</b> lock each desk port to the device that belongs there, using <b>port security</b>. You'll set up one port to learn and remember its PC automatically, and configure a second port to react more gently when an unknown device appears. The three possible reactions to a violation are a guaranteed exam question.`,
+  spec: [
+    { d: 'SW1 — F0/1', r: [
+      'A static access port with port security enabled.',
+      'A maximum of <b>1</b> MAC address.',
+      'That address learned automatically and written into the configuration rather than typed by you.',
+      'Leave the violation action at its default.',
+    ] },
+    { d: 'SW1 — F0/2', r: [
+      'Also a secured access port, but violations must be dropped and <b>logged and counted</b> while the port stays up.',
+    ] },
+    { t: 'Then prove it', r: [
+      'Generate traffic from PC1 so the sticky address is actually learned, and find it in the running configuration.',
+      'Be able to state, without looking, what shutdown, restrict and protect each do.',
+    ] },
+  ],
   tasks: [
     { t: 'On SW1, set F0/1 to access mode BEFORE anything else',
       do: [
@@ -1001,6 +1131,19 @@ L({
     topo.devs.R1.dhcp.excluded.push(['10.0.0.1', '10.0.0.9']);
   },
   intro: `<b>The situation:</b> R1 is already handing out IP addresses correctly. But if someone plugged their own address server into a desk port, PCs might believe it instead — and it could name itself as their gateway, quietly reading all their traffic.<br><b>Your goal:</b> teach the switch which port the <em>real</em> server lives behind, and to ignore address offers arriving from anywhere else. That's <b>DHCP snooping</b>: every port is untrusted until you say otherwise.`,
+  spec: [
+    { t: 'Starting point', r: [
+      'R1 is already a working DHCP server. Confirm PC1 can lease an address <b>before</b> you change anything.',
+    ] },
+    { d: 'SW1', r: [
+      'Enable DHCP snooping globally <b>and</b> activate it for <b>VLAN 1</b> — both are needed.',
+      'Trust only <b>G0/1</b>, the uplink toward the real server.',
+      'The access ports must remain untrusted.',
+    ] },
+    { t: 'Verification', r: [
+      'PC1 can still renew its lease afterwards — the security must not break the legitimate service.',
+    ] },
+  ],
   tasks: [
     { t: 'Confirm DHCP works before you secure it',
       do: [

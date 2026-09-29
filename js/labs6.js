@@ -32,6 +32,22 @@ L({
     topo.devs.R2.staticRoutes.push({ net: '10.0.1.0', mask: M24, via: '10.0.12.1', ad: 1 }, { net: '10.0.0.1', mask: '255.255.255.255', via: '10.0.12.1', ad: 1 });
   },
   intro: `<b>The situation:</b> nobody wants to remember that the file server is 10.0.2.100. DNS turns names into addresses, and Cisco devices both <em>use</em> it and can <em>provide</em> a small amount of it.<br><b>Your goal:</b> build name resolution three ways — a static host table typed into a router, a router acting as the resolver for the network, and a PC pointed at that resolver — then prove each one by pinging a name instead of an address. You will also meet <code>no ip domain-lookup</code> properly: the command every engineer types on day one, and now you will know exactly what it switches off.`,
+  spec: [
+    { d: 'R1 — acting as the site resolver', r: [
+      'Host entries for <b>srv</b> and <b>srv.netdrill.lab</b>, both resolving to <b>10.0.2.100</b>.',
+      'Host entries for <b>r2</b> (10.0.12.2) and <b>pc1</b> (10.0.1.10).',
+    ] },
+    { d: 'R2 — acting as a client', r: [
+      'A local host entry for <b>r1</b> = <b>10.0.12.1</b>, and no local entry for <b>pc1</b>.',
+      'Name server <b>10.0.0.1</b>, default domain <b>netdrill.lab</b>, and name lookups <b>enabled</b>.',
+      'It must resolve <b>srv</b> through the resolver rather than from its own table.',
+    ] },
+    { t: 'Verification', r: [
+      '<b>PC1</b> resolves <b>srv</b> from its configured DNS server and can reach the resulting address.',
+      'Try turning lookups off on R2 and watch what changes, then turn them back on.',
+      'Save both routers.',
+    ] },
+  ],
   tasks: [
     { t: 'Try a name before anything is configured, and read the error',
       do: [
@@ -206,6 +222,20 @@ L({
     topo.devs.R2.staticRoutes.push({ net: '10.0.0.0', mask: '255.255.255.0', via: '10.0.12.1', ad: 1 });
   },
   intro: `<b>The situation:</b> a monitoring station (the NMS) sits on the LAN and can see nothing. You have three devices that should be reporting their interface counters, CPU load and — more importantly — telling somebody when a link goes down at three in the morning.<br><b>Your goal:</b> configure SNMP on all three devices: read-only access for the monitoring system, the identity fields that make an alert readable, and a trap receiver so the devices report problems rather than waiting to be asked. You will also meet the read-write community, and understand why nobody sensible leaves one configured.`,
+  spec: [
+    { d: 'R1, SW1 and R2 — all three', r: [
+      'A <b>read-only</b> community string <b>NetDrillRO</b>.',
+      'A location and a contact string, so alerts identify themselves.',
+      'Traps sent to the monitoring station <b>10.0.0.200</b> using <b>version 2c</b> and that community.',
+      'Trap generation enabled.',
+      'Each device must be able to reach 10.0.0.200.',
+    ] },
+    { t: 'Also do, and then undo', r: [
+      'Create a <b>read-write</b> community on R1, look at it, and remove it again — no read-write community may remain.',
+      'Bounce an interface on R1 to produce something worth trapping, and leave it enabled.',
+      'Save all three devices.',
+    ] },
+  ],
   tasks: [
     { t: 'Look at the SNMP state before configuring anything',
       do: [
@@ -365,6 +395,25 @@ L({
     topo.devs.R2.staticRoutes.push({ net: '10.0.0.0', mask: '255.255.255.0', via: '10.0.12.1', ad: 1 });
   },
   intro: `<b>The situation:</b> three devices, no backups, and an IOS image sitting in flash that nobody has ever copied anywhere. When a switch dies you want to unbox the replacement, restore a config and go home — not rebuild it from memory.<br><b>Your goal:</b> learn the file-transfer commands properly. These are <b>interactive</b> commands: IOS asks you questions and you answer them line by line, which is exactly how it behaves on real hardware. You will back up configs to a TFTP server, restore one, copy an IOS image off the device, and configure FTP credentials for when TFTP is not enough.`,
+  spec: [
+    { t: 'The TFTP/FTP server is 10.0.0.100. Note that copy is interactive — it asks questions, one line at a time.', r: [] },
+    { d: 'Backups required on the server', r: [
+      '<b>R1-backup.cfg</b> — R1\'s running configuration.',
+      '<b>SW1-backup.cfg</b> — the switch\'s running configuration.',
+      '<b>R2-backup.cfg</b> — the branch router\'s, across the WAN link.',
+      '<b>ios-backup.bin</b> — R1\'s IOS image, archived out of flash.',
+      '<b>R1-over-ftp.cfg</b> — R1\'s running configuration again, this time over <b>FTP</b>.',
+    ] },
+    { d: 'R1 — other requirements', r: [
+      'FTP credentials: username <b>backupadmin</b>, password <b>B4ckupPass</b>.',
+      'Restore a configuration from the server into <b>NVRAM</b>.',
+      'Attempt one transfer to an unreachable address (10.0.9.99) and read the failure — nothing must be stored there.',
+    ] },
+    { t: 'Then look', r: [
+      'List the switch\'s flash and find the file that holds the VLAN database. Be able to say why a config-only restore is not enough.',
+      'Save all three devices.',
+    ] },
+  ],
   tasks: [
     { t: 'See what is stored on the device',
       do: [
@@ -532,6 +581,23 @@ L({
     const up = ND.getIface(topo.devs.SW1, 'g0/1'); up.swMode = 'trunk';
   },
   intro: `<b>The situation:</b> an IP phone and a PC share a desk and a cable. When somebody starts a large upload, the call breaks up. The link is not broken — it is <em>congested</em>, and congestion treats a voice packet exactly like a backup packet unless you tell it otherwise.<br><b>Your goal:</b> set up the switch end of a QoS design. You will enable QoS, decide where the <b>trust boundary</b> sits, trust the phone's markings while refusing the PC's, and understand what the router does with those markings further along. CCNA QoS is mostly conceptual, but the trust boundary is real configuration and it is where every design starts.`,
+  spec: [
+    { d: 'SW1 — port layout first', r: [
+      '<b>F0/1</b>: access port in the voice VLAN <b>150</b> (an IP phone is plugged straight into it).',
+      '<b>F0/2</b>: access port in data VLAN <b>10</b>, with voice VLAN <b>150</b> also configured.',
+    ] },
+    { d: 'SW1 — QoS', r: [
+      'QoS enabled globally.',
+      '<b>G0/1</b> (uplink to the router): trust the <b>DSCP</b> marking.',
+      '<b>F0/1</b> (the phone): trust its <b>CoS</b> marking, and only while a Cisco phone is actually detected there.',
+      '<b>F0/2</b> (the PC): trust nothing, and force its traffic to a default CoS of <b>0</b>.',
+      '<b>F0/3</b>: a spare phone port in VLAN 10 with voice VLAN 150, configured with the automatic VoIP template.',
+    ] },
+    { t: 'Verification', r: [
+      'The phone draws PoE, reaches <b>10.0.150.1</b>; the PC reaches <b>10.0.10.1</b>.',
+      'Be able to point at exactly where the trust boundary sits, and say why. Save SW1.',
+    ] },
+  ],
   tasks: [
     { t: 'Check whether QoS is doing anything at all yet',
       do: [
@@ -677,6 +743,21 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.SW1.hostname = 'SW1';
   },
   intro: `<b>The situation:</b> two devices in their default state. Anyone with a console cable owns them, the web server is running, there is no record of who logged in, and an attacker can guess passwords all night at full speed.<br><b>Your goal:</b> harden them. Individual accounts instead of shared passwords, AAA pointing at the local database, a minimum password length, automatic blocking after repeated failures, and every service you do not use switched off. None of this is exotic — it is the checklist every device should have had applied before it ever carried traffic.`,
+  spec: [
+    { d: 'R1 and SW1 — identical hardening on both', r: [
+      'Two local accounts: <b>netadmin</b> at privilege <b>15</b> and <b>monitor</b> at privilege <b>1</b>, both with hashed secrets.',
+      'AAA enabled, with login authentication using the <b>local</b> database.',
+      'An enable secret, password encryption on, and a minimum password length of <b>10</b>.',
+      'Login blocking: <b>120</b> seconds after <b>3</b> failures within <b>60</b> seconds.',
+      'Console and vty lines using the local accounts, with idle timeouts; the vty lines must accept <b>SSH only</b>.',
+      'The HTTP and HTTPS servers switched off.',
+      'A warning banner.',
+    ] },
+    { t: 'Verification', r: [
+      'PC1 must still reach <b>10.0.0.1</b> and <b>10.0.0.2</b> — hardening should be invisible to users.',
+      'Save both devices.',
+    ] },
+  ],
   tasks: [
     { t: 'Look at the unprotected starting state',
       do: [
@@ -844,6 +925,22 @@ L({
     r1.dhcp.excluded.push(['10.0.0.1', '10.0.0.9']);
   },
   intro: `<b>The situation:</b> ARP has no security whatsoever. Any device can announce "I am the default gateway" and every host on the segment will believe it, sending their traffic to an attacker who quietly forwards it on. That is ARP poisoning, and it is the standard man-in-the-middle attack on a switched LAN.<br><b>Your goal:</b> stop it with <b>Dynamic ARP Inspection</b>. DAI checks every ARP message arriving on an untrusted port against the DHCP snooping binding table and drops anything that does not match. That dependency is the key fact: <b>DAI without DHCP snooping has nothing to check against</b>, which is why this lab configures both.`,
+  spec: [
+    { t: 'Both PCs use DHCP. Get them leased BEFORE adding security, or there will be no bindings to validate against.', r: [] },
+    { d: 'SW1', r: [
+      'DHCP snooping enabled globally and scoped to <b>VLAN 1</b>.',
+      '<b>G0/1</b> (the uplink to R1) trusted for DHCP snooping.',
+      'Dynamic ARP Inspection enabled for <b>VLAN 1</b>.',
+      '<b>G0/1</b> trusted for ARP inspection as well — work out why the router needs this.',
+      '<b>F0/1</b> and <b>F0/2</b> left untrusted.',
+      'All three optional validation checks enabled: <b>src-mac</b>, <b>dst-mac</b> and <b>ip</b> — in a single command.',
+      'ARP rate limited to <b>10</b> packets per second on both access ports.',
+      '<b>F0/3</b> unused: described, access mode, and disabled.',
+    ] },
+    { t: 'Verification', r: [
+      'Both PCs still lease addresses and reach <b>10.0.0.1</b>. Save SW1.',
+    ] },
+  ],
   tasks: [
     { t: 'Confirm the DHCP service the whole lab depends on',
       do: [
@@ -1016,6 +1113,28 @@ L({
     topo.devs.ISP.staticRoutes.push({ net: '10.1.0.0', mask: '255.255.0.0', via: '203.0.113.2', ad: 1 });
   },
   intro: `<b>The situation:</b> the same handful of devices you have been configuring all course, arranged the way a real campus is arranged — an <b>access</b> switch where users plug in, a <b>distribution</b> switch doing the routing between VLANs, an <b>edge</b> router facing the provider, and the provider itself.<br><b>Your goal:</b> build a small collapsed-core design and see why the roles exist. You will dual-link the access switch to the distribution layer and bundle those links, route between VLANs on the distribution switch, and point a default route at the ISP. Along the way the explanation covers the WAN options, virtualization and the cloud service models — the theory chapters that this configuration gives a shape to.`,
+  spec: [
+    { d: 'ACC1 — the access layer', r: [
+      'VLAN <b>10</b> named <b>USERS</b>.',
+      '<b>F0/1</b>: access port in VLAN 10, described, with edge-port forwarding and BPDU protection.',
+      'Port security on that port: maximum <b>2</b> addresses, sticky learning, violation mode <b>restrict</b>.',
+      '<b>G0/1</b> and <b>G0/2</b> bundled into <b>channel-group 1</b> with LACP, both sides initiating.',
+      'The bundle is a trunk carrying VLAN 10 only.',
+    ] },
+    { d: 'DIST — the distribution layer', r: [
+      'VLAN <b>10</b> named <b>USERS</b>, and the matching half of the LACP bundle, trunked the same way.',
+      'Routing enabled, with the user gateway on <b>interface Vlan 10</b> = <b>10.1.10.1 255.255.255.0</b>.',
+      '<b>G0/3</b> converted to a <b>routed</b> port with <b>10.1.99.1 255.255.255.252</b>.',
+      'A default route toward the edge router.',
+    ] },
+    { d: 'EDGE', r: [
+      'A default route to the provider at <b>203.0.113.1</b>.',
+      'A route back down to the campus LAN <b>10.1.10.0/24</b> via <b>10.1.99.1</b>.',
+    ] },
+    { t: 'Verification', r: [
+      '<b>PC1</b> reaches <b>203.0.113.1</b>, and a trace shows distribution, then edge, then provider. Save all three devices.',
+    ] },
+  ],
   tasks: [
     { t: 'Build the access layer: VLAN, access port and edge protections',
       do: [
@@ -1179,6 +1298,21 @@ L({
     // the switch starts blank: the VLANs and the trunk are yours to build
   },
   intro: `<b>The situation:</b> a lightweight access point and a wireless LAN controller need to go onto the network, and two new wireless networks — staff and guest — need somewhere to land.<br><b>Your goal:</b> do the part of wireless that happens on the <b>command line</b>, which is the switch side: a management VLAN for the AP, PoE to power it, a trunk carrying the user VLANs, and the controller reachable. The wireless configuration itself — SSIDs, security policies, RF settings — is done in the WLC's web interface, so the explanation below walks through that in full, along with the radio and security theory the exam tests.`,
+  spec: [
+    { d: 'SW1 — the switch side is the whole CLI job here', r: [
+      'VLAN <b>90</b> named <b>AP-MGMT</b>, VLAN <b>20</b> named <b>WIFI-STAFF</b>, VLAN <b>30</b> named <b>WIFI-GUEST</b>.',
+      '<b>F0/1</b> (a <b>lightweight</b> access point): the right port mode for an AP that tunnels client traffic to a controller, in VLAN <b>90</b>, supplying PoE, forwarding immediately.',
+      '<b>F0/2</b> (the wireless LAN controller): access port in VLAN <b>90</b>.',
+      '<b>G0/1</b> (uplink to the router): a trunk carrying <b>20, 30 and 90</b> only, with DTP disabled.',
+    ] },
+    { t: 'Verification', r: [
+      'The AP is drawing power, reaches its gateway <b>10.0.90.1</b>, and reaches the controller <b>10.0.90.5</b>.',
+      'The controller reaches both the AP and the gateway. Save SW1.',
+    ] },
+    { t: 'Think it through', r: [
+      'Would the AP port still be an access port if this were an <b>autonomous</b> AP? Why not?',
+    ] },
+  ],
   tasks: [
     { t: 'Create the three VLANs a wireless deployment needs',
       do: [
@@ -1328,6 +1462,21 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.SW1.hostname = 'SW1';
   },
   intro: `<b>The situation:</b> you have now typed the same block of configuration onto five devices by hand more than once in this course. That is exactly the problem automation exists to solve — not because typing is hard, but because typing is <em>inconsistent</em>, and inconsistency is what causes outages.<br><b>Your goal:</b> prepare two devices for programmatic management. You will create a service account, switch on the encrypted transport an API needs, enable <b>RESTCONF</b> and <b>NETCONF</b>, and look at the configuration data an API would return. The explanation then covers SDN, REST, the three data formats and the configuration-management tools — the chapters that close out the CCNA.`,
+  spec: [
+    { d: 'R1 and SW1 — prepare both for programmatic management', r: [
+      'A dedicated service account <b>automation</b> at privilege <b>15</b>, separate from any human account.',
+      'The full SSH stack: hostname, domain <b>netdrill.lab</b>, <b>2048</b>-bit RSA keys, SSH version <b>2</b>.',
+      'The vty lines using the local account database and accepting SSH only.',
+      'The <b>HTTPS</b> server enabled and the plain <b>HTTP</b> server disabled.',
+      '<b>RESTCONF</b> and <b>NETCONF-YANG</b> both enabled.',
+    ] },
+    { d: 'R1 — one more thing', r: [
+      'Interface <b>G0/1</b> described as <b>MANAGED-BY-AUTOMATION</b>. Apply the same command twice and confirm the second application changes nothing.',
+    ] },
+    { t: 'Verification', r: [
+      'The management station reaches <b>10.0.0.1</b> and <b>10.0.0.2</b>. Save both devices.',
+    ] },
+  ],
   tasks: [
     { t: 'Create a service account for the tooling, separate from human accounts',
       do: [

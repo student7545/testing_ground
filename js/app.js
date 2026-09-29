@@ -10,6 +10,23 @@ const store = {
   get(key, fallback) { try { const v = localStorage.getItem('netdrill.' + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } },
   set(key, val) { try { localStorage.setItem('netdrill.' + key, JSON.stringify(val)); } catch { /* private mode etc. */ } },
 };
+
+/* ---------- lab modes ---------- */
+const MODES = [
+  { key: 'guided', label: 'Guided', hint: 'Guided: the full task checklist plus the step-by-step commands. Use it the first time through a lab.' },
+  { key: 'drill', label: 'Drill', hint: 'Drill: task headlines and the live checks only \u2014 the step-by-step commands are hidden. Use it to run a lab you have already done, from memory.' },
+  { key: 'practice', label: 'Practice', hint: 'Practice: a requirements brief and the topology, nothing else. No steps, no hints, no command reference \u2014 configure it the way you would in an exam.' },
+];
+function currentMode() {
+  const m = store.get('mode', null);
+  if (m && MODES.some(x => x.key === m)) return m;
+  return store.get('drill', false) ? 'drill' : 'guided';   // migrate the old boolean
+}
+function setMode(m) {
+  store.set('mode', m);
+  store.set('drill', m === 'drill');                        // keep the old key in step
+}
+
 const progress = () => store.get('progress', {});
 const repsOf = id => (progress()[id] || {}).reps || 0;
 const addRep = id => { const p = progress(); p[id] = { reps: repsOf(id) + 1, last: Date.now() }; store.set('progress', p); };
@@ -161,7 +178,13 @@ function renderHome() {
   wrap.appendChild(el('section', 'howto', `
     <h2>How to use NetDrill</h2>
     <ul>
-      <li><b>Repetition first.</b> Follow the steps exactly the first time. Then hit <i>Reset Lab</i> and do it again from the checklist alone. Then turn on <i>Drill Mode</i> (steps hidden) and run it purely from memory. Three clean drill-mode reps and the lab is yours.</li>
+      <li><b>Three modes, in this order.</b> The picker in the top bar switches between them at any time.
+        <ul>
+          <li><b>Guided</b> — the full task checklist plus the step-by-step commands. Use it the first time through a lab.</li>
+          <li><b>Drill</b> — task headlines and the live checks only; the commands are hidden. Use it to repeat a lab from memory.</li>
+          <li><b>Practice</b> — training wheels off: the topology and a requirements brief, nothing else. No tasks, no steps, no command reference. This is the one that tells you whether you actually know it.</li>
+        </ul>
+      </li>
       <li><b>Terminal skills count.</b> Abbreviate everything (<code>conf t</code>, <code>int g0/1</code>, <code>sh ip int br</code>), lean on <kbd>?</kbd> and <kbd>Tab</kbd>, use <kbd>↑</kbd> for history, and <code>do</code> to run show commands from config mode.</li>
       <li><b>Pick a lab</b> from the panel on the left — Volume 1 then Volume 2, in Jeremy's IT Lab day order. Work straight down the list.</li>
       <li><b>Switch consoles</b> with the device tabs above the terminal. PCs speak Windows-style: <code>ipconfig</code>, <code>ipconfig /renew</code>, <code>ping</code>, <code>tracert</code>.</li>
@@ -179,19 +202,34 @@ function renderHome() {
 function setTopbar(lab) {
   const bar = $('#topbar-actions');
   bar.innerHTML = '';
-  if (!lab) return;
-  const drill = store.get('drill', false);
-  const drillBtn = el('button', 'btn' + (drill ? ' primary' : ''), drill ? 'Drill Mode: ON' : 'Drill Mode: OFF');
-  drillBtn.title = drill
-    ? 'Drill Mode is ON: the step-by-step instructions are hidden. Work from the task list and the live checks alone. Click to show the steps again.'
-    : 'Drill Mode: hides the step-by-step instructions so you run the lab from the task list and live checks alone \u2014 for practising from memory.';
-  drillBtn.addEventListener('click', () => { store.set('drill', !store.get('drill', false)); renderLab(lab, true); });
+  const mode = currentMode();
+  if (!lab) {
+    /* overview page: the picker still sets the mode the next lab opens in */
+    const seg0 = el('div', 'modeseg');
+    for (const m of MODES) {
+      const b = el('button', 'modebtn' + (m.key === mode ? ' on' : ''), m.label);
+      b.title = m.hint;
+      b.addEventListener('click', () => { setMode(m.key); setTopbar(null); });
+      seg0.appendChild(b);
+    }
+    bar.appendChild(seg0);
+    return;
+  }
+  const seg = el('div', 'modeseg');
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'Lab mode');
+  for (const m of MODES) {
+    const b = el('button', 'modebtn' + (m.key === mode ? ' on' : ''), m.label);
+    b.title = m.hint;
+    b.addEventListener('click', () => { setMode(m.key); renderLab(lab, true); });
+    seg.appendChild(b);
+  }
   const resetBtn = el('button', 'btn danger', 'Reset Lab');
   resetBtn.title = 'Wipe all devices back to factory defaults so you can run this lab again from scratch. Your rep count is kept.';
   resetBtn.addEventListener('click', () => resetLab(lab));
-  const homeBtn = el('button', 'btn', '← Overview');
+  const homeBtn = el('button', 'btn', '\u2190 Overview');
   homeBtn.addEventListener('click', () => { location.hash = ''; });
-  bar.append(homeBtn, drillBtn, resetBtn);
+  bar.append(homeBtn, seg, resetBtn);
 }
 
 function resetLab(lab) {
@@ -204,7 +242,7 @@ function renderLab(lab, keepState) {
     S = { lab, topo: buildTopo(lab), active: lab.devices[0].id, termBufs: {}, completedThisRun: false };
     for (const d of lab.devices) S.termBufs[d.id] = [];
   }
-  const drill = store.get('drill', false);
+  const mode = currentMode();
   const app = $('#content');
   app.innerHTML = '';
   const wrap = el('div', 'wrap');
@@ -220,9 +258,9 @@ function renderLab(lab, keepState) {
   const tabs = el('div', 'tabs');
   const body = el('div', 'tabbody');
   const tabDefs = [
-    ['Instructions', () => instructionsHtml(lab, drill)],
+    ['Instructions', () => instructionsHtml(lab, mode)],
     ['Explanation', () => `<p class="dim">Theory behind this lab — read it when you're past the pure-repetition phase.</p>` + lab.explain],
-    ['Reference', () => referenceHtml(lab)],
+    ['Reference', () => referenceHtml(lab, mode)],
   ];
   let activeTab = 0;
   tabDefs.forEach(([name, fn], idx) => {
@@ -289,9 +327,9 @@ function renderLab(lab, keepState) {
   }
 }
 
-function taskHtml(t) {
+function taskHtml(t, mode) {
   if (typeof t === 'string') return `<li><div class="taskline"><span class="tasktext">${t}</span></div></li>`;
-  const dos = Array.isArray(t.do) ? t.do : null;
+  const dos = mode === 'drill' ? null : (Array.isArray(t.do) ? t.do : null);
   let h = `<li><div class="taskline"><span class="tasktext">${t.t}</span>`;
   if (t.why) h += `<button class="whybtn" aria-expanded="false">why?</button>`;
   h += `</div>`;
@@ -301,23 +339,54 @@ function taskHtml(t) {
   return h + `</li>`;
 }
 
-function instructionsHtml(lab, drill) {
+function specHtml(lab) {
+  /* Practice mode: a requirements brief. Authored per lab; a lab without one
+     falls back to the grading criteria, which state the same requirements. */
+  const groups = Array.isArray(lab.spec) && lab.spec.length
+    ? lab.spec
+    : [{ r: lab.checks.map(c => c.desc) }];
+  let h = '<div class="spec">';
+  for (const g of groups) {
+    h += '<div class="specgroup">';
+    if (g.d || g.t) {
+      h += '<div class="specdev">'
+        + (g.d ? `<span class="stepdev">${g.d}</span>` : '')
+        + (g.t ? `<span class="specnote">${g.t}</span>` : '')
+        + '</div>';
+    }
+    h += `<ul>${g.r.map(r => `<li>${r}</li>`).join('')}</ul>`;
+    h += '</div>';
+  }
+  return h + '</div>';
+}
+
+function instructionsHtml(lab, mode) {
   const hideSol = store.get('hideSol', true);
+
+  if (mode === 'practice') {
+    let h = `<div class="callout practice"><b>Practice mode \u2014 training wheels off.</b> You get the topology and the requirements below: no task checklist, no step-by-step commands, no command reference. Work the configuration out yourself, the way you would in an exam or on a real change.</div>`;
+    h += `<p>${lab.pintro || lab.intro}</p>`;
+    h += `<h3>Requirements</h3><p class="dim">Configure the network so that every line below is true. The live checks on the right grade you as you type \u2014 nothing else will tell you whether you have it right.</p>`;
+    h += specHtml(lab);
+    h += `<p class="dim smallnote">Stuck? Switch to <b>Guided</b> in the top bar for the full walkthrough, then reset the lab and run it again from here.</p>`;
+    return h;
+  }
+
   let h = `<p>${lab.intro}</p>`;
-  h += `<h3>Your tasks</h3><ol class="tasks">${lab.tasks.map(taskHtml).join('')}</ol>`;
-  if (drill) {
-    h += `<div class="callout"><b>Drill Mode is on.</b> Step-by-step commands are hidden — work from the task list and the live checks. Toggle Drill Mode off in the top bar if you get stuck.</div>`;
+  h += `<h3>Your tasks</h3><ol class="tasks">${lab.tasks.map(t => taskHtml(t, mode)).join('')}</ol>`;
+  if (mode === 'drill') {
+    h += `<div class="callout"><b>Drill mode.</b> Each task is boiled down to its headline and the step-by-step commands are hidden \u2014 work from the task list and the live checks alone. Switch to <b>Guided</b> in the top bar if you get stuck, or to <b>Practice</b> for the requirements-only version.</div>`;
   } else {
     h += `<div class="ctlrow"><h3>Step by step</h3><button class="btn small" id="soltoggle">${hideSol ? 'Solutions: hidden' : 'Solutions: shown'}</button></div>`;
-    if (hideSol) h += `<p class="dim">Commands are tucked away — try each step from memory, then reveal only if you need to.</p>`;
+    if (hideSol) h += `<p class="dim">Commands are tucked away \u2014 try each step from memory, then reveal only if you need to.</p>`;
     h += `<ol>`;
-    for (const s of lab.steps) {
-      h += `<li>${s.d ? `<span class="stepdev">${s.d}</span>` : ''}${s.t}`;
-      const sol = `<pre>${s.c.join('\n')}</pre>`;
+    for (const st of lab.steps) {
+      h += `<li>${st.d ? `<span class="stepdev">${st.d}</span>` : ''}${st.t}`;
+      const sol = `<pre>${st.c.join('\n')}</pre>`;
       h += hideSol ? `<details class="sol"><summary>Show commands</summary>${sol}</details>` : sol;
       h += `<details class="explain"><summary>Explain this step</summary><div class="explain-body">`
-        + (s.note ? `<p>${s.note}</p>` : '')
-        + `<ul>${s.c.map(cmd => `<li><code>${cmd}</code><span class="dash">—</span>${explainCmd(cmd)}</li>`).join('')}</ul>`
+        + (st.note ? `<p>${st.note}</p>` : '')
+        + `<ul>${st.c.map(cmd => `<li><code>${cmd}</code><span class="dash">\u2014</span>${explainCmd(cmd)}</li>`).join('')}</ul>`
         + `</div></details></li>`;
     }
     h += '</ol>';
@@ -326,11 +395,16 @@ function instructionsHtml(lab, drill) {
   return h;
 }
 
-function referenceHtml(lab) {
+function referenceHtml(lab, mode) {
   const hideSol = store.get('hideSol', true);
-  let h = `<h3>Command quick reference</h3><p class="dim">Every command this lab uses, in order — scan it before a from-memory rep.</p>`;
-  const allCmds = `<pre>${lab.steps.map(s => s.c.join('\n')).join('\n')}</pre>`;
-  h += hideSol ? `<details class="sol"><summary>Show all commands</summary>${allCmds}</details>` : allCmds;
+  let h = '';
+  if (mode === 'practice') {
+    h += `<div class="callout practice"><b>Practice mode.</b> The command reference is hidden. The cabling and host addressing below are the whole handout \u2014 the same information a real lab exam gives you.</div>`;
+  } else {
+    h += `<h3>Command quick reference</h3><p class="dim">Every command this lab uses, in order \u2014 scan it before a from-memory rep.</p>`;
+    const allCmds = `<pre>${lab.steps.map(x => x.c.join('\n')).join('\n')}</pre>`;
+    h += hideSol ? `<details class="sol"><summary>Show all commands</summary>${allCmds}</details>` : allCmds;
+  }
   h += `<h3>Topology facts</h3><ul>`;
   for (const [a, ia, b, ib] of lab.links) h += `<li><code>${a}</code> ${ND.normIface(ia) ? ND.shortIface(ND.normIface(ia)) : ia} ↔ ${ND.normIface(ib) ? ND.shortIface(ND.normIface(ib)) : ib} <code>${b}</code></li>`;
   h += '</ul>';

@@ -36,6 +36,36 @@ L({
     topo.devs.R2.staticRoutes.push({ net: '10.0.1.0', mask: M24, via: '10.0.12.1', ad: 1 }, { net: '10.0.2.0', mask: M24, via: '10.0.12.1', ad: 1 });
   },
   intro: `<b>The situation:</b> two routers joining four networks — two user LANs, a server LAN holding a web server and a database server, and a branch LAN. Routing already works, so at this moment everything can reach everything.<br><b>Your goal:</b> every kind of access list there is, written repeatedly on <b>both</b> routers until the syntax is automatic. Numbered and named, standard and extended, the <code>host</code> and <code>any</code> shortcuts, wildcard masks, TCP and ICMP matching, port numbers, sequence numbers including inserting a rule between two existing ones, both directions of application, protecting the router's own vty lines, and finally removing lists cleanly.`,
+  spec: [
+    { d: 'R1 — list 10 (numbered standard), applied outbound on G0/2', r: [
+      'Permit the single host <b>10.0.1.10</b> using the host shorthand.',
+      'Deny the network <b>10.0.2.0/24</b> using a wildcard mask.',
+      'Permit everything else — and get the order right.',
+    ] },
+    { d: 'R2 — list 20 (numbered standard), applied inbound on G0/2', r: [
+      'Deny the single host <b>10.0.4.99</b>.',
+      'Permit the rest of <b>10.0.4.0/24</b>, then permit everything else.',
+      'Delete the whole list and rebuild it once, to see what removing a numbered list costs.',
+    ] },
+    { d: 'Management protection', r: [
+      '<b>R1</b>: a named standard list <b>VTY-ACCESS</b> permitting <b>10.0.1.0/24</b>, applied to the vty lines.',
+      '<b>R2</b>: a named standard list <b>MGMT-HOSTS</b> with <b>two</b> permits — <b>10.0.4.0/24</b> and host <b>10.0.1.10</b> — applied to its vty lines.',
+    ] },
+    { d: 'R1 — EDGE-IN (named extended), applied inbound on G0/0', r: [
+      'Sequence <b>10</b>: permit TCP from 10.0.1.0/24 to host <b>10.0.3.100</b> on port <b>80</b>.',
+      'Sequence <b>20</b>: permit TCP from any to that host on port <b>443</b>.',
+      'Sequence <b>30</b>: permit IP any any.',
+      'Then <b>insert</b> a rule at sequence <b>25</b> denying ICMP to <b>10.0.3.100</b> only — without rebuilding the list.',
+    ] },
+    { d: 'R2 — list 120 (numbered extended), applied inbound on G0/0', r: [
+      'Deny <b>TCP 23</b> to host <b>10.0.3.200</b>, then permit everything else.',
+    ] },
+    { t: 'Required end state', r: [
+      'PC1 may still reach the web server on TCP 80, but its ping to that server is blocked.',
+      'PC1 can still ping the OTHER server, which no rule names.',
+      'PC2 is blocked from both servers; the branch LAN still reaches both. Save both routers.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Establish the "before" picture from every host',
       do: [
@@ -281,6 +311,24 @@ L({
     topo.devs.R2.staticRoutes.push({ net: '0.0.0.0', mask: '0.0.0.0', via: '203.0.113.5', ad: 1 });
   },
   intro: `<b>The situation:</b> two branch offices, each on private addresses, each with a single public address from the same ISP. Site A also runs two servers that are supposed to be reachable from the internet, and right now they have no public identity at all.<br><b>Your goal:</b> the complete NAT command set, configured on <b>both</b> edge routers so every step is done twice. Mark the inside and outside domains, build two permanent one-to-one mappings for the servers, classify the user traffic with an access list, overload the public interface so the whole office shares one address, then practise removing and rebuilding each piece.<br><span class="dim">Note: this simulator models NAT configuration and the translation table rather than rewriting packet headers, so verification here is by <code>show</code> command rather than by pinging the internet — which is exactly how the exam objective is worded.</span>`,
+  spec: [
+    { d: 'R1 — site A (two published servers plus users)', r: [
+      'NAT inside and outside marked on the correct interfaces.',
+      'Static mapping: <b>192.168.1.100</b> published as <b>203.0.113.100</b>.',
+      'Static mapping: <b>192.168.1.200</b> published as <b>203.0.113.200</b>.',
+      'Numbered access list <b>1</b> selecting <b>192.168.1.0/24</b>, and PAT overloading the address of <b>G0/1</b>.',
+      'Exactly <b>two</b> static mappings must remain at the end — remove one and rebuild it along the way.',
+    ] },
+    { d: 'R2 — site B (users only, no published servers)', r: [
+      'NAT inside and outside marked.',
+      'A <b>named</b> standard access list as the classifier, selecting <b>172.16.5.0/24</b>.',
+      'PAT overloading its own outside interface.',
+      'No static mappings at all.',
+    ] },
+    { t: 'Verification', r: [
+      'Inside connectivity at both sites is unaffected, and both edge routers still reach the ISP. Save both routers.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Mark the NAT inside and outside interfaces on R1',
       do: [
@@ -487,6 +535,26 @@ L({
     topo.devs.R3.staticRoutes.push({ net: '0.0.0.0', mask: '0.0.0.0', via: '10.0.13.1', ad: 1 });
   },
   intro: `<b>The situation:</b> a head office and two branches. Four PCs, all set to obtain addresses automatically, and nobody handing any out. Routing between the sites already works, so this drill is purely about DHCP.<br><b>Your goal:</b> make one router the address server for <b>all three</b> subnets. You will build three pools with the complete option set, protect reserved addresses with both forms of the exclusion command, and configure <b>two separate relay agents</b> — because the branch PCs broadcast, and routers do not forward broadcasts. Then you will secure the whole thing so a rogue server on a desk port cannot hijack it.`,
+  spec: [
+    { d: 'R1 — one server for three subnets', r: [
+      'Exclusions on the local subnet using <b>both</b> forms: a single address and a range.',
+      'Exclusions covering the low range of both branch subnets as well.',
+      'Three pools — <b>LAN1</b> (10.0.1.0/24), <b>LAN2</b> (10.0.2.0/24) and <b>LAN3</b> (10.0.3.0/24).',
+      'Each pool carries the full option set: network, default router, DNS server, domain name and lease.',
+      'Delete <b>LAN3</b> and rebuild it once, to feel what editing a pool actually costs.',
+    ] },
+    { d: 'R2 and R3 — the relays', r: [
+      'Each relays DHCP from the interface facing its own clients toward R1.',
+      'On <b>R3</b>, also try a helper on the server-facing interface, reason about why it cannot work, and remove it.',
+    ] },
+    { d: 'SW1 — access-layer security', r: [
+      'DHCP snooping enabled and scoped to <b>VLAN 1</b>.',
+      'Only the uplink trusted; the desk ports remain untrusted.',
+    ] },
+    { t: 'Verification', r: [
+      'All four PCs hold leases — two local, two through relays — with different addresses, none from the excluded range, all carrying the DNS option. Save all four devices.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Confirm all four PCs start with no address',
       do: [
@@ -719,6 +787,28 @@ L({
     topo.devs.R1.hostname = 'R1';
   },
   intro: `<b>The situation:</b> two switches and a router that can only be configured from a console cable, with every port live and willing to accept whatever somebody plugs in.<br><b>Your goal:</b> lock all three down completely. You will build the full SSH stack <b>three separate times</b> — deliberately triggering the prerequisite errors first so you understand why the order matters — restrict who may even attempt to connect, then pin six desk ports to the devices that belong on them, drilling all three violation reactions and both ways of specifying a permitted MAC address.`,
+  spec: [
+    { d: 'SW1, SW2 and R1 — the SSH stack three times', r: [
+      'A domain name and <b>2048</b>-bit RSA keys on each.',
+      'SSH version <b>2</b> enforced, with a local <b>admin</b> account.',
+      'vty lines: local login, SSH only, and an idle timeout.',
+      'An <b>access-class</b> list restricting which sources may connect. <b>SW2</b>\'s list must permit <b>two</b> subnets.',
+      'Both switches also need a management SVI and a default gateway.',
+    ] },
+    { d: 'SW1 — port security', r: [
+      '<b>F0/1</b>: access mode, maximum <b>2</b> addresses, sticky learning, default violation action.',
+      '<b>F0/2</b>: maximum <b>1</b>, violation <b>restrict</b>, sticky learning.',
+      '<b>F0/3</b>: violation <b>protect</b> with a <b>static</b> MAC address you type yourself — removed and rebuilt once.',
+    ] },
+    { d: 'SW2 — port security', r: [
+      'Three secured ports, one of them allowing up to <b>3</b> addresses.',
+      'Between the two switches, all three violation modes must be in use somewhere.',
+    ] },
+    { t: 'Verification', r: [
+      'Generate traffic so sticky learning captures real addresses on both switches.',
+      'Unused ports shut down on both. Save all three devices.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Try to generate keys before setting a domain name, and read the refusal',
       do: [
@@ -959,6 +1049,28 @@ L({
     topo.devs.R3.staticRoutes.push({ net: '0.0.0.0', mask: '0.0.0.0', via: '10.0.23.1', ad: 1 });
   },
   intro: `<b>The situation:</b> five devices where nothing agrees on the time, every log message exists only on the box that produced it, and you have no diagram of what is cabled to what.<br><b>Your goal:</b> the three services that make a network operable rather than merely functional. Build an NTP hierarchy — one master and a <b>chain</b> of clients — send logs centrally with the severity filter tuned, and map the whole topology with the discovery protocols before deliberately switching them off again, because the information they hand you helps an intruder just as much as it helps you.`,
+  spec: [
+    { d: 'Time — a chain, not a star', r: [
+      '<b>R1</b> is the authoritative source at <b>stratum 3</b>.',
+      '<b>R2</b> synchronises to R1, and <b>R3</b> synchronises to <b>R2</b>.',
+      'Both client routers must end up reporting a synchronised clock.',
+    ] },
+    { d: 'Logging — R1, R2 and SW1', r: [
+      'All three log to the server <b>10.0.0.100</b> at trap level <b>warnings</b>, with a <b>16384</b>-byte buffer.',
+      '<b>R1</b> and <b>R2</b> also have console logging switched off.',
+      'On R1, try trap levels <b>errors</b> and <b>debugging</b> first, and understand the difference before settling on warnings.',
+      'Bounce <b>R2 G0/2</b> to generate a real message, and leave the interface enabled.',
+    ] },
+    { d: 'Discovery — the asymmetry to build', r: [
+      '<b>R3</b>: CDP disabled <b>globally</b>.',
+      '<b>R2 G0/1</b>: CDP disabled per interface, then re-enabled with the positive form.',
+      'R2 must therefore no longer see R3 over CDP, while still seeing R1 and SW2.',
+      '<b>LLDP</b> enabled on all five devices, so R2 can see R3 again over LLDP.',
+    ] },
+    { t: 'Verification', r: [
+      'Sweep NTP, logging, CDP and LLDP on every device, and save all five.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Check the clock state on all three routers before configuring anything',
       do: [
@@ -1258,6 +1370,22 @@ L({
     ND.getIface(dev('R2'), 'g0/1').aclOut = 'LOCKDOWN';
   },
   intro: `<b>The situation:</b> a network that used to work. Two user VLANs behind a pair of switches, a router-on-a-stick gateway, a WAN link to a second router, and a server on the far side. Somebody spent a weekend "tidying up" and now almost nothing reaches anything. There is no documentation and nobody is admitting to anything.<br><b>Your goal:</b> find and repair <b>eleven separate faults</b> using nothing but show commands and reasoning. They run the full stack — a port in the wrong VLAN, a trunk that filters one out, a VLAN missing from a switch entirely, a port sitting err-disabled, a gateway addressed wrongly, a subinterface tagged for the wrong VLAN, a disabled interface, a /30 mismatch, a route to a next hop that does not exist, missing return routes, and a forgotten access list.<br><b>The method matters more than the answers:</b> work bottom-up and near-to-far, change one thing at a time, and re-test after every fix. Each fault has a fingerprint, and by the end of this lab you should recognise all eleven on sight.`,
+  spec: [
+    { t: 'Nothing here is a build task. This network USED to work and now barely functions. There are ELEVEN separate faults; find and repair every one of them using show commands and reasoning.', r: [] },
+    { t: 'The intended design (this is what it should look like when you are finished)', r: [
+      '<b>PC1</b> sits in VLAN <b>10</b> (10.0.10.0/24, gateway <b>10.0.10.1</b>).',
+      '<b>PC2</b> and <b>PC3</b> sit in VLAN <b>20</b> (10.0.20.0/24, gateway <b>10.0.20.1</b>), on different switches.',
+      'Both VLANs cross the SW1–SW2 trunk and reach <b>R1</b>, which is a router-on-a-stick holding both gateways.',
+      '<b>R1</b> and <b>R2</b> are joined by a <b>/30</b> WAN link using <b>10.0.12.1</b> and <b>10.0.12.2</b>.',
+      '<b>R2</b> serves the server LAN <b>10.0.30.0/24</b>, where <b>SRV</b> lives at <b>10.0.30.100</b>.',
+      'Every host must reach every other host, and the server, in both directions.',
+    ] },
+    { t: 'Method', r: [
+      'Work bottom-up and near-to-far. Change one thing at a time and re-test after every fix.',
+      'Gather symptoms from all three PCs before you touch anything — including a test that involves no router at all.',
+      'Save all four network devices when the network is healthy again.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Reproduce the problem from all three PCs before touching anything',
       do: [

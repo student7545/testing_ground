@@ -36,6 +36,17 @@ L({
   devices: [{ id: 'SW1', type: 'switch', ifaces: ['g0/1', 'g0/2', 'f0/1', 'f0/2'] }],
   links: [], layout: { SW1: [190, 40] },
   intro: `<b>The situation:</b> a brand-new switch, straight out of the box. No name, no passwords, wide open.<br><b>Your goal:</b> learn to move between the command-line modes, then give the switch a name and basic security. This is the exact opening routine you'll repeat at the start of <em>every</em> lab in this course — run it until your fingers do it without thinking.`,
+  spec: [
+    { d: 'SW1', r: [
+      'Hostname <b>SW1</b>.',
+      'Privileged EXEC mode protected by the password <b>cisco123</b>, stored as a hash rather than in plain text.',
+      'The console port protected by the password <b>ccna</b>, and actually prompting for it.',
+      'Every remaining plaintext password in the configuration obscured.',
+      'The device must not attempt a DNS lookup when a command is mistyped.',
+      'A message-of-the-day banner (wording is your choice).',
+      'The finished configuration saved so that it survives a reload.',
+    ] },
+  ],
   tasks: [
     { t: 'Walk up through the three command modes on SW1',
       do: [
@@ -145,6 +156,13 @@ L({
   links: [['PC1', 'e0', 'SW1', 'f0/1'], ['PC2', 'e0', 'SW1', 'f0/2']],
   layout: { PC1: [60, 20], PC2: [60, 90], SW1: [220, 55] },
   intro: `<b>The situation:</b> two PCs are plugged into a switch, already addressed and able to reach each other.<br><b>Your goal:</b> make them talk, then look inside the switch to see what it learned. A switch has one core job — remember which device is on which port — and this lab shows that memory being built, erased, and rebuilt.`,
+  spec: [
+    { t: 'No configuration is required in this lab — it is about making the switch learn, and reading what it learned.', r: [
+      '<b>PC1</b> (192.168.1.11) and <b>PC2</b> (192.168.1.12) must each prove they can reach the other.',
+      '<b>SW1</b> must end up with a learned MAC address entry on <b>Fa0/1</b> and on <b>Fa0/2</b>.',
+      'Along the way: empty the MAC address table, confirm it is empty, then refill it with fresh traffic.',
+    ] },
+  ],
   tasks: [
     { t: 'Check the addressing on PC1 before you send anything',
       do: [
@@ -230,6 +248,17 @@ L({
   links: [['PC1', 'e0', 'R1', 'g0/0'], ['PC2', 'e0', 'R1', 'g0/1']],
   layout: { PC1: [50, 20], R1: [190, 55], PC2: [330, 20] },
   intro: `<b>The situation:</b> two PCs sit on two different networks (10.0.1.x and 10.0.2.x), with a router between them. The router's ports are switched off and have no addresses, so nothing works yet.<br><b>Your goal:</b> give each router port an address and turn it on, so the PCs can reach each other through it. The pattern you'll repeat here — pick an interface, give it an address, turn it on — is the most-typed sequence in all of CCNA.`,
+  spec: [
+    { d: 'R1', r: [
+      'Hostname <b>R1</b>.',
+      '<b>G0/0</b> (facing PC1): address <b>10.0.1.1 255.255.255.0</b>, a description, and enabled.',
+      '<b>G0/1</b> (facing PC2): address <b>10.0.2.1 255.255.255.0</b>, a description, and enabled.',
+      'Both interfaces must read up/up.',
+    ] },
+    { t: 'Verification', r: [
+      '<b>PC1</b> (10.0.1.10) can ping <b>PC2</b> (10.0.2.10) through the router.',
+    ] },
+  ],
   tasks: [
     { t: 'Name the router R1',
       do: [
@@ -320,6 +349,13 @@ L({
   links: [['PC1', 'e0', 'SW1', 'f0/1'], ['PC2', 'e0', 'SW1', 'f0/2']],
   layout: { PC1: [60, 20], PC2: [60, 90], SW1: [220, 55] },
   intro: `<b>The situation:</b> a switch with 7 ports, but only two of them (F0/1 and F0/2) actually have PCs plugged in. The other five sit unused and live — anyone could plug into them.<br><b>Your goal:</b> tidy and secure the physical ports: fix the speed and duplex on the two host ports, label them, and switch off everything unused. You'll also meet the <i>interface range</i> command, which configures many ports in one go.`,
+  spec: [
+    { d: 'SW1', r: [
+      '<b>F0/1</b> and <b>F0/2</b> (the two host ports): speed hard-coded to <b>100</b>, duplex hard-coded to <b>full</b>, and a description on each.',
+      '<b>F0/3</b> through <b>F0/6</b> and <b>G0/1</b> are unused and must be administratively disabled.',
+      'Use the fewest commands you can — the range form exists for exactly this.',
+    ] },
+  ],
   tasks: [
     { t: 'Select the two host ports together with a range command',
       do: [
@@ -398,6 +434,23 @@ L({
   links: [['PC1', 'e0', 'R1', 'g0/0'], ['R1', 'g0/1', 'R2', 'g0/1'], ['R2', 'g0/0', 'PC2', 'e0']],
   layout: { PC1: [40, 30], R1: [150, 30], R2: [250, 30], PC2: [355, 30] },
   intro: `<b>The situation:</b> two routers connected to each other, each with its own PC network behind it. Nothing is configured yet.<br><b>Your goal:</b> address everything, then teach each router how to reach the network on the far side. A router only knows the networks it is directly plugged into — anything else you must tell it about. R1 will get a route to one specific network; R2 will get a "send everything else this way" default route.`,
+  spec: [
+    { d: 'R1', r: [
+      'Hostname <b>R1</b>.',
+      '<b>G0/0</b> (LAN): <b>10.0.1.1 255.255.255.0</b>, enabled.',
+      '<b>G0/1</b> (link to R2): <b>192.168.12.1 255.255.255.252</b>, enabled.',
+      'A route to the far LAN <b>10.0.2.0/24</b>.',
+    ] },
+    { d: 'R2', r: [
+      'Hostname <b>R2</b>.',
+      '<b>G0/0</b> (LAN): <b>10.0.2.1 255.255.255.0</b>, enabled.',
+      '<b>G0/1</b> (link to R1): <b>192.168.12.2 255.255.255.252</b>, enabled.',
+      'Rather than a route per destination, a single <b>default route</b> sending everything unknown back toward R1.',
+    ] },
+    { t: 'Verification', r: [
+      '<b>PC1</b> (10.0.1.10) and <b>PC2</b> (10.0.2.10) can reach each other in <b>both</b> directions.',
+    ] },
+  ],
   tasks: [
     { t: 'Name the first router R1',
       do: [
@@ -516,6 +569,18 @@ L({
   links: [['PC1', 'e0', 'SW1', 'f0/1'], ['PC2', 'e0', 'SW1', 'f0/2'], ['PC3', 'e0', 'SW1', 'f0/3']],
   layout: { PC1: [50, 15], PC2: [50, 95], PC3: [340, 15], SW1: [200, 55] },
   intro: `<b>The situation:</b> three PCs plugged into one switch, all on the same network — right now every PC can reach every other PC.<br><b>Your goal:</b> split them into two separate groups using VLANs: PC1 and PC2 go into the engineering group, PC3 into the sales group. Afterwards PC1 and PC2 still talk to each other, but neither can reach PC3 — and you will not have changed a single IP address to do it.`,
+  spec: [
+    { d: 'SW1', r: [
+      'VLAN <b>10</b> named <b>ENGINEERING</b> and VLAN <b>20</b> named <b>SALES</b> in the VLAN database.',
+      '<b>F0/1</b> and <b>F0/2</b> are access ports in VLAN <b>10</b>.',
+      '<b>F0/3</b> is an access port in VLAN <b>20</b>.',
+    ] },
+    { t: 'Required end state', r: [
+      '<b>PC1</b> can still reach <b>PC2</b> (both in VLAN 10).',
+      '<b>PC1</b> can <b>no longer</b> reach <b>PC3</b> — even though all three share 10.0.0.0/24 and one switch.',
+      'Do not change any IP address to achieve this.',
+    ] },
+  ],
   tasks: [
     { t: 'Record the "before" picture: prove all three PCs can currently reach each other',
       do: [
@@ -619,6 +684,22 @@ L({
   links: [['PC1', 'e0', 'SW1', 'f0/1'], ['PC2', 'e0', 'SW1', 'f0/2'], ['SW1', 'g0/1', 'SW2', 'g0/1'], ['SW2', 'f0/1', 'PC3', 'e0'], ['SW2', 'f0/2', 'PC4', 'e0']],
   layout: { PC1: [35, 15], PC2: [35, 95], SW1: [140, 55], SW2: [260, 55], PC3: [360, 15], PC4: [360, 95] },
   intro: `<b>The situation:</b> two switches, joined by a single cable. Each switch hosts PCs from <em>both</em> groups — VLAN 10 and VLAN 20 exist on both sides.<br><b>Your goal:</b> set up both switches, then turn the cable between them into a <b>trunk</b> — a link that carries several VLANs at once by labelling each frame with its VLAN number. You'll also tighten two trunk settings that matter for security: the native VLAN and the list of VLANs allowed across.`,
+  spec: [
+    { d: 'SW1', r: [
+      'VLANs <b>10</b> and <b>20</b> created.',
+      '<b>F0/1</b> access port in VLAN <b>10</b>; <b>F0/2</b> access port in VLAN <b>20</b>.',
+      '<b>G0/1</b> (the link to SW2): a permanent trunk, not a negotiated one.',
+      'That trunk uses native VLAN <b>1001</b> and carries <b>only</b> VLANs 10 and 20.',
+    ] },
+    { d: 'SW2', r: [
+      'Identical configuration: VLANs 10 and 20, <b>F0/1</b> in VLAN 10, <b>F0/2</b> in VLAN 20.',
+      '<b>G0/1</b> a permanent trunk with native VLAN <b>1001</b> and the same allowed list.',
+    ] },
+    { t: 'Required end state', r: [
+      '<b>PC1</b> reaches <b>PC3</b> (10.0.10.12) and <b>PC2</b> reaches <b>PC4</b> (10.0.20.12) across the trunk.',
+      'Traffic between different VLANs must still fail — there is no router in this lab.',
+    ] },
+  ],
   tasks: [
     { t: 'On SW1, create VLANs 10 and 20',
       do: [
@@ -726,6 +807,21 @@ L({
   links: [['R1', 'g0/0', 'SW1', 'g0/1'], ['SW1', 'f0/1', 'PC1', 'e0'], ['SW1', 'f0/2', 'PC2', 'e0']],
   layout: { R1: [200, 12], SW1: [200, 68], PC1: [80, 105], PC2: [320, 105] },
   intro: `<b>The situation:</b> PC1 is in VLAN 10, PC2 is in VLAN 20, so they cannot talk to each other. A router is available — but it only has ONE cable to the switch.<br><b>Your goal:</b> let the two VLANs communicate through that single router cable. The trick is to split one physical router port into several <b>subinterfaces</b>, one per VLAN, each acting as that VLAN's gateway. Because everything balances on one cable, this design is nicknamed <b>"router on a stick"</b>.`,
+  spec: [
+    { d: 'SW1', r: [
+      'VLANs <b>10</b> and <b>20</b> created.',
+      '<b>F0/1</b> access port in VLAN <b>10</b> (PC1); <b>F0/2</b> access port in VLAN <b>20</b> (PC2).',
+      '<b>G0/1</b> (the single uplink to R1): a trunk.',
+    ] },
+    { d: 'R1', r: [
+      '<b>G0/0</b> enabled and carrying <b>no IP address of its own</b>.',
+      'A subinterface serving VLAN <b>10</b>, tagged for that VLAN, addressed <b>10.0.10.1 255.255.255.0</b>.',
+      'A subinterface serving VLAN <b>20</b>, tagged for that VLAN, addressed <b>10.0.20.1 255.255.255.0</b>.',
+    ] },
+    { t: 'Verification', r: [
+      '<b>PC1</b> (10.0.10.10) can ping <b>PC2</b> (10.0.20.10) — the packet must leave and return through the same physical router port.',
+    ] },
+  ],
   tasks: [
     { t: 'On SW1, create the two VLANs the hosts live in',
       do: [
@@ -824,6 +920,17 @@ L({
   links: [['SW1', 'g0/1', 'SW2', 'g0/1']],
   layout: { SW1: [110, 45], SW2: [290, 45] },
   intro: `<b>The situation:</b> two switches joined by a cable, with two automatic features running that most engineers deliberately switch off.<br><b>Your goal:</b> first watch <b>DTP</b> form a trunk by itself (convenient, but it means an attacker's device could do the same), then lock the port down manually. Then neutralise <b>VTP</b>, a feature that syncs VLAN lists between switches and has a nasty habit of wiping them instead. This is a lab about turning things off on purpose.`,
+  spec: [
+    { d: 'SW1 and SW2', r: [
+      'The link between them (<b>G0/1</b> on each) must be a <b>permanent</b> trunk on both ends — no negotiation.',
+      'Both ends must also stop sending DTP frames entirely.',
+      'Both switches in VTP mode <b>transparent</b>.',
+      'Both switches in VTP domain <b>NETDRILL</b>.',
+    ] },
+    { t: 'Before you lock it down', r: [
+      'First set SW1\'s port to <b>dynamic desirable</b>, leave SW2 at its default, and confirm a trunk forms on its own. Then take control of it.',
+    ] },
+  ],
   tasks: [
     { t: 'On SW1, set G0/1 to dynamic desirable and let DTP do the work',
       do: [
@@ -913,6 +1020,19 @@ L({
   links: [['SW1', 'g0/1', 'SW2', 'g0/1'], ['SW1', 'g0/2', 'SW3', 'g0/1'], ['SW2', 'g0/2', 'SW3', 'g0/2'], ['SW1', 'f0/1', 'PC1', 'e0']],
   layout: { SW1: [200, 12], SW2: [90, 80], SW3: [310, 80], PC1: [200, 110] },
   intro: `<b>The situation:</b> three switches cabled in a triangle. That loop would flood the network to death — Spanning Tree Protocol prevents it by automatically blocking one path, and electing one switch as the "root" that all traffic centres on.<br><b>Your goal:</b> stop leaving that election to chance. Choose which switch becomes root (and which is the backup), upgrade all three to the faster version of STP, and protect the port where a PC plugs in.`,
+  spec: [
+    { d: 'SW1, SW2 and SW3', r: [
+      'All three switches running <b>Rapid PVST+</b>.',
+    ] },
+    { d: 'SW1', r: [
+      'The <b>root bridge</b> for VLAN 1, with a bridge priority of <b>24576</b>.',
+      '<b>F0/1</b> (the PC port) configured as an edge port so it forwards immediately.',
+      'That same port protected so it shuts itself down if a switch is ever plugged into it.',
+    ] },
+    { d: 'SW2', r: [
+      'The <b>backup root</b> for VLAN 1, with a bridge priority of <b>28672</b>.',
+    ] },
+  ],
   tasks: [
     { t: 'On SW1, switch spanning tree to the fast version (Rapid PVST+)',
       do: [
@@ -1005,6 +1125,20 @@ L({
   links: [['SW1', 'g0/1', 'SW2', 'g0/1'], ['SW1', 'g0/2', 'SW2', 'g0/2'], ['SW1', 'f0/1', 'PC1', 'e0'], ['SW2', 'f0/1', 'PC2', 'e0']],
   layout: { PC1: [40, 45], SW1: [140, 45], SW2: [260, 45], PC2: [360, 45] },
   intro: `<b>The situation:</b> two cables run between SW1 and SW2 for extra bandwidth — but Spanning Tree sees a loop and blocks one of them, so you only ever get the speed of one cable.<br><b>Your goal:</b> bundle both cables into a single logical link (an <b>EtherChannel</b>). Spanning Tree then sees one link instead of two, blocks nothing, and you get the bandwidth you paid for. You'll use LACP, the standard protocol for negotiating the bundle.`,
+  spec: [
+    { d: 'SW1', r: [
+      '<b>G0/1</b> and <b>G0/2</b> bundled into <b>channel-group 1</b>, using LACP in the mode that <b>initiates</b> the negotiation.',
+      'The resulting logical interface configured as a trunk.',
+    ] },
+    { d: 'SW2', r: [
+      'The same two ports in <b>channel-group 1</b>, using LACP in the mode that only <b>responds</b>.',
+      'Its logical interface configured as a trunk too.',
+    ] },
+    { t: 'Verification', r: [
+      'The bundle must actually form — the summary should show the channel in use with both members bundled.',
+      '<b>PC1</b> can ping <b>PC2</b> (10.0.0.12) across it.',
+    ] },
+  ],
   tasks: [
     { t: 'On SW1, bundle both uplinks into channel-group 1 using LACP active mode',
       do: [
@@ -1102,6 +1236,28 @@ L({
     set('R3', 'g0/0', '10.0.23.3', '255.255.255.252'); set('R3', 'g0/1', '10.0.3.1', '255.255.255.0');
     topo.devs.R1.hostname = 'R1'; topo.devs.R2.hostname = 'R2'; topo.devs.R3.hostname = 'R3';
   },
+  spec: [
+    { t: 'All addressing is already done. Advertise it with OSPF — process ID 1, area 0, everywhere.', r: [
+      'Every router must set its own router ID explicitly.',
+    ] },
+    { d: 'R1', r: [
+      'Router ID <b>1.1.1.1</b>.',
+      'Advertise the LAN <b>10.0.1.0/24</b> and the link <b>10.0.12.0/30</b>.',
+      'No OSPF hellos on the LAN interface (G0/0) — but the LAN must still be advertised.',
+    ] },
+    { d: 'R2', r: [
+      'Router ID <b>2.2.2.2</b>.',
+      'Advertise both /30 links: <b>10.0.12.0/30</b> and <b>10.0.23.0/30</b>.',
+    ] },
+    { d: 'R3', r: [
+      'Router ID <b>3.3.3.3</b>.',
+      'Advertise the link <b>10.0.23.0/30</b> and the LAN <b>10.0.3.0/24</b>.',
+      'No OSPF hellos on its LAN interface (G0/1) either.',
+    ] },
+    { t: 'Verification', r: [
+      'Both adjacencies reach state <b>FULL</b>, and <b>PC1</b> can ping <b>PC3</b> (10.0.3.10).',
+    ] },
+  ],
   tasks: [
     { t: 'Survey the network before configuring anything',
       do: [
@@ -1225,6 +1381,22 @@ L({
   links: [['R1', 'g0/0', 'SW1', 'f0/1'], ['R2', 'g0/0', 'SW1', 'f0/2'], ['PC1', 'e0', 'SW1', 'f0/3']],
   layout: { R1: [110, 12], R2: [290, 12], SW1: [200, 68], PC1: [200, 112] },
   intro: `<b>The situation:</b> a PC can only be given ONE default gateway address. If that router dies, the PC is cut off — even if a second router sits right next to it, unused.<br><b>Your goal:</b> make two routers share a single "virtual" gateway address (10.0.0.1) that the PC points at. One router answers for it normally; the other takes over automatically within seconds if the first fails, and the PC never notices. The protocol that does this is <b>HSRP</b>.`,
+  spec: [
+    { d: 'R1', r: [
+      '<b>G0/0</b>: real address <b>10.0.0.2 255.255.255.0</b>, enabled.',
+      'HSRP group <b>1</b> sharing the virtual address <b>10.0.0.1</b>.',
+      'Configured so that R1 is the <b>Active</b> router by design, with priority <b>110</b>.',
+      'Configured so that R1 <b>takes the Active role back</b> after recovering from a failure.',
+    ] },
+    { d: 'R2', r: [
+      '<b>G0/0</b>: real address <b>10.0.0.3 255.255.255.0</b>, enabled.',
+      'The same HSRP group <b>1</b> and the same virtual address <b>10.0.0.1</b>, at the default priority.',
+    ] },
+    { t: 'Verification', r: [
+      'R1 reports <b>Active</b> and R2 reports <b>Standby</b>.',
+      '<b>PC1</b> can ping <b>10.0.0.1</b> — an address no single router owns.',
+    ] },
+  ],
   tasks: [
     { t: 'On R1, address G0/0 with its own real IP and enable it',
       do: [
@@ -1317,6 +1489,23 @@ L({
   links: [['R1', 'g0/1', 'R2', 'g0/1']],
   layout: { R1: [120, 45], R2: [280, 45] },
   intro: `<b>The situation:</b> two routers connected to each other, this time addressed with IPv6 instead of IPv4. IPv6 routing is switched off by default, so nothing will forward yet.<br><b>Your goal:</b> turn on IPv6 routing, address the link between the routers and each router's own network, then give each one a static route to the other's network. Along the way you'll meet two things IPv4 doesn't have: automatic <b>link-local</b> addresses, and <b>EUI-64</b>, where the router builds half of its own address from its MAC address.`,
+  spec: [
+    { d: 'R1', r: [
+      'IPv6 packet forwarding enabled.',
+      '<b>G0/1</b> (link to R2): <b>2001:db8:12::1/64</b>, enabled.',
+      '<b>G0/0</b> (LAN): <b>2001:db8:1::1/64</b>, enabled.',
+      'A static IPv6 route to R2\'s LAN, <b>2001:db8:2::/64</b>.',
+    ] },
+    { d: 'R2', r: [
+      'IPv6 packet forwarding enabled.',
+      '<b>G0/1</b> (link to R1): <b>2001:db8:12::2/64</b>, enabled.',
+      '<b>G0/0</b> (LAN): prefix <b>2001:db8:2::/64</b>, with the host half derived from the interface MAC rather than typed by you.',
+      'A static IPv6 route back to <b>2001:db8:1::/64</b>.',
+    ] },
+    { t: 'Also worth doing', r: [
+      'Find the FE80:: addresses neither of you configured, and be able to say where they came from.',
+    ] },
+  ],
   tasks: [
     { t: 'On R1, switch on IPv6 routing',
       do: [

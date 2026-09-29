@@ -27,6 +27,23 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.R2.hostname = 'R2'; topo.devs.SW1.hostname = 'SW1';
   },
   intro: `<b>The situation:</b> a small network you have never seen before — two routers, a switch, a PC and an IP phone — and no documentation.<br><b>Your goal:</b> learn what each box actually does, how its ports are named, and how to read the physical layer from the command line. You will set speed and duplex by hand, see what auto-negotiation reports, and control Power over Ethernet on the port feeding the phone. Everything here is Day 1 knowledge that the rest of the course quietly assumes.`,
+  spec: [
+    { d: 'SW1', r: [
+      'A description on <b>F0/1</b> (a PC), <b>F0/2</b> (an IP phone) and <b>G0/1</b> (the uplink to R1).',
+      '<b>F0/1</b>: speed and duplex hard-coded to <b>100 / full</b>.',
+      '<b>G0/1</b>: speed and duplex hard-coded to <b>1000 / full</b>.',
+      '<b>F0/2</b>: hard-code it first, then return it to <b>auto-negotiation</b> for both settings.',
+      'Power over Ethernet <b>refused</b> on <b>F0/1</b> and <b>F0/3</b>.',
+      'Power over Ethernet explicitly set to <b>auto</b> on the phone port <b>F0/2</b>.',
+      'Configuration saved.',
+    ] },
+    { t: 'Investigation (no configuration required)', r: [
+      'Identify the platform and IOS image of the switch and of <b>R1</b>.',
+      'Work out from discovery output which neighbour is on which port, without looking at the diagram.',
+      'Find the input errors and collision counters for one port.',
+      'Confirm <b>PC1</b> can reach its gateway <b>10.0.0.1</b>.',
+    ] },
+  ],
   tasks: [
     { t: 'Work out what device you are logged into and what it is cabled to',
       do: [
@@ -185,6 +202,22 @@ L({
     topo.devs.R1.hostname = 'R1'; topo.devs.SW1.hostname = 'SW1';
   },
   intro: `<b>The situation:</b> the OSI model is usually taught as seven words to memorise. Here you are going to <em>see</em> each layer instead, by running the command that exposes it on a real path from a PC to a server.<br><b>Your goal:</b> walk up the stack one layer at a time — cable, MAC address, IP address, port number — and watch the same packet be described differently at each step. Then walk it back down, which is exactly the method you will use to troubleshoot for the rest of your career.`,
+  spec: [
+    { t: 'This lab is about seeing each layer, so most of it is investigation.', r: [
+      'Layer 1: confirm which ports have a live neighbour on <b>SW1</b>.',
+      'Layer 2: make <b>SW1</b> learn MAC addresses, and match an entry to the port it came from.',
+      'Layer 3: read <b>R1</b>\'s routing table and its ARP table, and explain what the ARP table is for.',
+    ] },
+    { d: 'R1 — the layer-4 part', r: [
+      'A named extended access list <b>LAYER4-DEMO</b> that permits <b>TCP 80</b>, <b>TCP 443</b>, <b>UDP 53</b> and <b>ICMP</b>, and denies everything else.',
+      'Applied <b>outbound</b> on <b>G0/1</b>.',
+    ] },
+    { t: 'Then prove the dependency between layers', r: [
+      'Confirm <b>PC1</b> reaches the server <b>10.0.1.100</b>.',
+      'Disable <b>R1 G0/1</b>, observe what happens to the routing table and to the ping, then enable it again and re-test.',
+      'From PC1, check the ARP cache and be able to explain why the server is not in it.',
+    ] },
+  ],
   tasks: [
     { t: 'LAYER 1 — check that there is a signal on every hop',
       do: [
@@ -323,6 +356,27 @@ L({
   links: [['PC1', 'e0', 'R1', 'g0/0'], ['R1', 'g0/1', 'R2', 'g0/0'], ['R2', 'g0/1', 'PC2', 'e0']],
   layout: { PC1: [35, 60], R1: [145, 60], R2: [255, 60], PC2: [360, 60] },
   intro: `<b>The situation:</b> four blank interfaces and a handful of addresses that have to be typed exactly right.<br><b>Your goal:</b> get fluent with IPv4 addressing itself — the classes, the private ranges everyone uses, masks written both ways, and the two addresses in every subnet you are <em>not</em> allowed to give to a host. You will configure a 10-network, a 172.16 network, a 192.168 network and a /30 link, which between them cover every private range in the exam.`,
+  spec: [
+    { d: 'R1', r: [
+      'Hostname <b>R1</b>.',
+      '<b>G0/0</b>: <b>172.16.1.1 255.255.255.0</b>, described, enabled.',
+      '<b>G0/1</b> (link to R2): <b>10.0.12.1 255.255.255.252</b>, described, enabled.',
+      '<b>Loopback 0</b>: <b>1.1.1.1 255.255.255.255</b>.',
+      '<b>Loopback 1</b>: <b>10.255.255.1 255.255.255.0</b>.',
+      'A route to R2\'s LAN <b>192.168.50.0/24</b>.',
+    ] },
+    { d: 'R2', r: [
+      'Hostname <b>R2</b>.',
+      '<b>G0/0</b> (link to R1): <b>10.0.12.2 255.255.255.252</b>, described, enabled.',
+      '<b>G0/1</b>: <b>192.168.50.1 255.255.255.0</b>, described, enabled.',
+      'A route back to <b>172.16.1.0/24</b>.',
+    ] },
+    { t: 'Verification and understanding', r: [
+      '<b>PC1</b> (172.16.1.10) and <b>PC2</b> (192.168.50.10) reach each other.',
+      'For each interface, be able to state its network address, broadcast address and usable range.',
+      'Save R1.',
+    ] },
+  ],
   tasks: [
     { t: 'On R1, address the class B private LAN with a /24',
       do: [
@@ -485,6 +539,22 @@ L({
     topo.devs.R2.staticRoutes.push({ net: '10.0.1.0', mask: M24, via: '10.0.12.1', ad: 1 });
   },
   intro: `<b>The situation:</b> a fully working network — two LANs, two routers, a switch and three hosts. Nothing is broken.<br><b>Your goal:</b> follow one packet from PC1 to the server and understand exactly what happens at every step. You will empty the ARP caches and the MAC table, send a single ping, and then look at what each device learned. This is the lab that makes "IP addresses stay the same, MAC addresses change at every hop" stop being a slogan and start being something you have watched happen.`,
+  spec: [
+    { t: 'No configuration at all — this lab is about watching one packet and reading what it left behind.', r: [
+      'Start by emptying the MAC address table on <b>SW1</b> and the ARP caches on <b>R1</b> and <b>R2</b>.',
+    ] },
+    { t: 'Required end state', r: [
+      '<b>PC1</b> can reach <b>PC2</b> (10.0.1.20) in its own subnet, and the server <b>10.0.2.100</b> two routers away.',
+      '<b>PC1</b>\'s ARP cache holds its <b>default gateway</b> and must <b>not</b> hold the remote server.',
+      '<b>SW1</b> has learned MAC addresses on more than one port.',
+      '<b>R1</b> has an ARP entry for its next hop across the WAN link (10.0.12.2).',
+      '<b>R2</b> has an ARP entry for an address on its server LAN.',
+    ] },
+    { t: 'Then answer', r: [
+      'Why does the switch never appear in a traceroute?',
+      'What changes at every hop, and what stays the same end to end?',
+    ] },
+  ],
   tasks: [
     { t: 'Empty the switch\'s MAC address table',
       do: [
@@ -624,6 +694,29 @@ L({
   links: [['PC1', 'e0', 'R1', 'g0/0'], ['PC2', 'e0', 'R1', 'g0/1'], ['R1', 'g0/2', 'R2', 'g0/0'], ['R2', 'g0/1', 'PC3', 'e0']],
   layout: { PC1: [30, 25], PC2: [30, 100], R1: [150, 62], R2: [265, 62], PC3: [370, 62] },
   intro: `<b>The situation:</b> your company owns exactly one address block — <b>192.168.10.0/24</b> — and you have four networks to build from it: an engineering LAN needing 60 hosts, a sales LAN needing 30, a small branch LAN needing 14, and a router-to-router link needing 2.<br><b>Your goal:</b> carve that single /24 into four right-sized subnets using VLSM, configure them, and prove the plan works. The arithmetic is the exam's single most-tested skill, and doing it on live interfaces beats doing it on paper because the router tells you when you are wrong.<br><br><b>The plan to implement:</b><br>• 60 hosts → <b>/26</b> (62 usable): 192.168.10.0/26, gateway .1<br>• 30 hosts → <b>/27</b> (30 usable): 192.168.10.64/27, gateway .65<br>• 14 hosts → <b>/28</b> (14 usable): 192.168.10.96/28, gateway .97<br>• 2 hosts → <b>/30</b> (2 usable): 192.168.10.112/30, addresses .113 and .114`,
+  spec: [
+    { t: 'You own exactly one block: 192.168.10.0/24. Four networks must come out of it, with nothing wasted.', r: [
+      'Engineering LAN: <b>60 hosts</b>.',
+      'Sales LAN: <b>30 hosts</b>.',
+      'Branch LAN: <b>14 hosts</b>.',
+      'Router-to-router link: <b>2 hosts</b>.',
+      'Allocate largest first, in that order, starting at the bottom of the block.',
+    ] },
+    { d: 'R1', r: [
+      'Hostname <b>R1</b>. <b>G0/0</b> = the Engineering gateway, <b>G0/1</b> = the Sales gateway, <b>G0/2</b> = the WAN link.',
+      'Each interface takes the <b>first usable address</b> of its subnet, with the correct mask, described and enabled.',
+      'A route to the branch LAN with the correct mask.',
+    ] },
+    { d: 'R2', r: [
+      'Hostname <b>R2</b>. <b>G0/0</b> = the other end of the WAN link, <b>G0/1</b> = the Branch gateway.',
+      'Routes back to both of R1\'s LANs, each with the correct mask.',
+    ] },
+    { t: 'Verification', r: [
+      'The hosts are already addressed — <b>PC1</b> .10, <b>PC2</b> .70, <b>PC3</b> .100 — so your subnets must match them.',
+      'Every host reaches its own gateway and both other LANs. Save both routers.',
+    ] },
+  ],
+  pintro: `<b>The situation:</b> your company owns exactly one address block \u2014 <b>192.168.10.0/24</b> \u2014 and four networks have to come out of it: an engineering LAN needing <b>60 hosts</b>, a sales LAN needing <b>30</b>, a branch LAN needing <b>14</b>, and a router-to-router link needing <b>2</b>.<br><b>Your goal:</b> work out the VLSM plan yourself \u2014 network address, mask, usable range and broadcast for each \u2014 then configure it and prove it works. Allocate the largest requirement first. The host addresses are already set on the PCs, so your subnets have to match them.`,
   tasks: [
     { t: 'Do the arithmetic before you touch a single interface',
       do: [
@@ -769,6 +862,23 @@ L({
   links: [['SW1', 'g0/1', 'SW2', 'g0/1'], ['SW2', 'g0/2', 'SW3', 'g0/1'], ['SW3', 'g0/2', 'SW1', 'g0/2'], ['PC1', 'e0', 'SW1', 'f0/1']],
   layout: { SW1: [90, 35], SW2: [260, 35], SW3: [175, 120], PC1: [30, 120] },
   intro: `<b>The situation:</b> three switches wired in a triangle. Physically that is a loop, and an unmanaged loop at layer 2 will melt a network in seconds — broadcast storms, MAC table instability, duplicate frames.<br><b>Your goal:</b> run <b>Rapid PVST+</b> on all three, choose the root bridge deliberately rather than letting the switches pick, read the port roles the protocol assigns, and make the host-facing port come up instantly and safely. Classic STP takes 30-50 seconds to converge; RSTP does it in one or two, and the exam expects you to know exactly why.`,
+  spec: [
+    { d: 'SW1, SW2 and SW3', r: [
+      'All three named, and all three running <b>Rapid PVST+</b>.',
+    ] },
+    { d: 'SW1', r: [
+      'The <b>root bridge</b> for VLAN 1, priority <b>4096</b>.',
+      '<b>F0/1</b> (the PC port) set as an edge port, and protected so it err-disables if a switch appears on it.',
+    ] },
+    { d: 'SW2', r: [
+      'The <b>backup root</b>, priority <b>8192</b>.',
+      'The same two edge-port protections applied <b>globally</b> rather than per interface.',
+    ] },
+    { t: 'Then read the tree', r: [
+      'Name the role of every port on every switch, and say which port is blocking and why.',
+      'Save all three switches.',
+    ] },
+  ],
   tasks: [
     { t: 'Look at what spanning tree is doing before you change anything',
       do: [
@@ -920,6 +1030,23 @@ L({
     for (const r of ['R1', 'R2', 'R3']) topo.devs[r].hostname = r;
   },
   intro: `<b>The situation:</b> three routers in a triangle, every link addressed and up, and not one routing entry between them. There are two ways to fix that — type every route by hand, or let the routers tell each other. This lab does both, on the same network, so you can see exactly how a router chooses when it is offered the same destination twice.<br><b>Your goal:</b> understand <b>administrative distance</b> — the number that decides which source of routing information a router believes — and build a floating static route, the standard backup-path technique that depends entirely on it.`,
+  spec: [
+    { t: 'All links are addressed already. The job is to compare how a router chooses between sources of routing information.', r: [] },
+    { d: 'All three routers', r: [
+      'OSPF process <b>1</b>, area <b>0</b>, with router IDs <b>1.1.1.1</b>, <b>2.2.2.2</b> and <b>3.3.3.3</b>.',
+      'Advertise every 10.0.x.x interface and each router\'s own loopback.',
+    ] },
+    { d: 'R1 — the comparison', r: [
+      'Start with a static route to <b>3.3.3.3/32</b> via <b>10.0.12.2</b>, and work out which source wins once OSPF is running.',
+      'Then remove that static route so the OSPF path is used.',
+      'Add a <b>floating</b> static to 3.3.3.3/32 via <b>10.0.12.2</b> with an administrative distance of <b>200</b>, and confirm it does NOT appear in the table.',
+      'Break the direct link to R3, confirm the backup installs and traffic still flows, then restore the link.',
+      'Finally add a <b>3.3.3.0/24</b> static via 10.0.12.2 and work out which route a packet to 3.3.3.3 actually uses.',
+    ] },
+    { t: 'Verification', r: [
+      'R1 reaches <b>2.2.2.2</b> and <b>3.3.3.3</b>; <b>PC1</b> reaches 3.3.3.3. Save all three routers.',
+    ] },
+  ],
   tasks: [
     { t: 'Start with what you already know — a static route',
       do: [
@@ -1079,6 +1206,23 @@ L({
     topo.devs.R1.hostname = 'R1';
   },
   intro: `<b>The situation:</b> one PC, one router and one server that runs several services at once — a web site, a secure shell, a DNS resolver and a TFTP daemon. All of them share a single IP address.<br><b>Your goal:</b> understand how <b>port numbers</b> keep those conversations apart, learn the well-known numbers the exam expects on sight, and then read layer 4 directly by writing access lists that permit one service while denying another. This is the chapter that makes extended ACLs make sense.`,
+  spec: [
+    { d: 'R1 — list SERVICES, applied outbound on G0/1', r: [
+      'Permit <b>TCP 80</b> and <b>TCP 443</b> from <b>10.0.1.0/24</b> to <b>host 10.0.2.100</b>.',
+      'Permit <b>TCP 22</b> from the same source to the same host — but not Telnet.',
+      'Permit <b>ICMP</b> from that network to that host.',
+      'Permit <b>UDP 53</b>, <b>69</b>, <b>123</b> and <b>161</b> to the same host.',
+      'Permit FTP using a single entry that covers <b>ports 20 and 21</b> rather than two separate lines.',
+    ] },
+    { d: 'R1 — list RETURN-ONLY, applied outbound on G0/0', r: [
+      'Permit TCP back to <b>10.0.1.0/24</b> only when it belongs to a session the inside started.',
+      'Permit ICMP so your own testing still works.',
+    ] },
+    { t: 'Then be able to say', r: [
+      'Which port number belongs to each of: FTP, SSH, Telnet, SMTP, DNS, DHCP, TFTP, HTTP, NTP, SNMP, HTTPS, syslog.',
+      'Save R1.',
+    ] },
+  ],
   tasks: [
     { t: 'Establish that everything works before you filter anything',
       do: [

@@ -22,6 +22,36 @@ L({
   links: [['SW1', 'g0/1', 'R1', 'g0/0'], ['SW2', 'g0/1', 'R1', 'g0/1'], ['R1', 'g0/2', 'R2', 'g0/0'], ['SW3', 'g0/1', 'R2', 'g0/1']],
   layout: { SW1: [50, 20], SW2: [50, 96], R1: [170, 58], R2: [290, 58], SW3: [370, 58] },
   intro: `<b>The situation:</b> five brand-new devices — three switches and two routers — none of them named, secured or saved.<br><b>Your goal:</b> the opening routine you will perform on every device for the rest of your career, typed out five separate times until your fingers stop needing your brain. Then every variant of it: both kinds of password, both kinds of line, every timeout form, banners with different delimiters, and the full NVRAM lifecycle including erasing and reloading. If you can do this lab from memory you can walk up to any Cisco device and take control of it.`,
+  spec: [
+    { t: 'Commission five devices from scratch: SW1, SW2, SW3, R1 and R2.', r: [] },
+    { d: 'Every device', r: [
+      'Its own hostname (<b>SW1</b>, <b>SW2</b>, <b>SW3</b>, <b>R1</b>, <b>R2</b>).',
+      'An enable secret.',
+      'A console password with password checking switched on.',
+      'vty lines that require authentication — a password with login, or local accounts.',
+      'A domain name, with DNS lookups disabled.',
+      'The configuration saved to NVRAM.',
+    ] },
+    { d: 'SW1, SW2, SW3 and R1', r: [
+      'A console idle timeout. On <b>R1</b> it must end at a sane value — not <b>0 0</b>.',
+      '<b>SW1</b>, <b>SW2</b> and <b>R1</b> also use logging synchronous on the console.',
+      '<b>SW1</b> finishes with password encryption enabled and <b>no</b> plaintext enable password.',
+    ] },
+    { d: 'Banners', r: [
+      '<b>SW1</b>, <b>SW2</b>, <b>R1</b> and <b>R2</b> each carry a message-of-the-day banner.',
+      '<b>SW3</b> must end with <b>no</b> banner — set one, then remove it.',
+    ] },
+    { d: 'R2', r: [
+      'Two local user accounts, and vty lines that authenticate against them rather than a shared password.',
+    ] },
+    { d: 'R1', r: [
+      'A name server configured, with DNS lookups left <b>off</b>.',
+      'All three links described and enabled.',
+    ] },
+    { t: 'Verification', r: [
+      '<b>R1</b> sees SW1, SW2 and R2 over CDP; <b>R2</b> sees R1 and SW3. R2\'s links are enabled.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Walk every command mode on SW1 and back out of each',
       do: [
@@ -322,6 +352,33 @@ L({
   ],
   layout: { PC1: [35, 22], SW1: [120, 58], R1: [205, 58], R2: [290, 58], SW2: [360, 22], PC2: [360, 105] },
   intro: `<b>The situation:</b> two routers, two switches and two PCs, none of them addressed and none of the router ports even switched on.<br><b>Your goal:</b> every kind of interface at CCNA level, configured repeatedly until the pattern is automatic — physical ports, several loopbacks, management SVIs on both switches, a routed port on the layer-3 switch, and a subinterface. Along the way you will produce all three of the interface status wordings deliberately, so that when you meet one in a fault you already know what it means, and you will finish by sweeping every verification command there is.`,
+  spec: [
+    { d: 'R1', r: [
+      'Hostname <b>R1</b>. <b>G0/0</b> = <b>10.1.1.1/24</b> and <b>G0/2</b> = <b>10.0.12.1/30</b>, both described and up.',
+      '<b>G0/1</b> = <b>10.9.9.1/24</b>, enabled (it has no neighbour, so expect down/down).',
+      'Three loopbacks with three different masks: a <b>/32</b>, a <b>/24</b> and a <b>/30</b>.',
+      'A subinterface <b>G0/1.100</b> tagged for VLAN 100 with an address.',
+    ] },
+    { d: 'R2', r: [
+      'Hostname <b>R2</b>. <b>G0/0</b> = <b>10.0.12.2/30</b> and <b>G0/1</b> = <b>10.2.2.1/24</b>, described and up, plus its own <b>/32</b> loopback.',
+      'The two routers must reach each other across the /30.',
+    ] },
+    { d: 'SW1', r: [
+      '<b>F0/1</b> hard-coded to <b>100/full</b> with a description.',
+      '<b>F0/2-3</b> returned to <b>auto</b> speed and duplex after being hard-coded.',
+      '<b>F0/5</b> ends with <b>no</b> description; <b>F0/7</b> keeps <b>half</b> duplex.',
+      '<b>F0/4</b>, <b>F0/6</b> and <b>F0/8</b> shut down.',
+      'A management SVI <b>10.1.1.2/24</b> and a default gateway.',
+      'Routing enabled, and <b>G0/2</b> as a <b>routed</b> port with <b>172.16.99.1/30</b> restored after converting it back and forth.',
+    ] },
+    { d: 'SW2', r: [
+      '<b>F0/1</b> configured and described; <b>F0/2-4</b> described and shut down.',
+      'A management SVI <b>10.2.2.2/24</b> and a default gateway.',
+    ] },
+    { t: 'Verification', r: [
+      'Each PC reaches both its gateway and its local switch SVI. Save R1, SW1 and SW2.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Configure R1 G0/0 typing the interface name in full',
       do: [
@@ -612,6 +669,31 @@ L({
   ],
   layout: { R1: [110, 18], SW1: [110, 72], SW2: [215, 72], SW3: [315, 72], PC1: [30, 40], PC2: [30, 72], PC3: [30, 104], PC4: [215, 122], PC5: [215, 30], PC6: [375, 72] },
   intro: `<b>The situation:</b> three switches chained together carrying three departments — Engineering, Sales and Guest — with users of each scattered across different switches. One router arm is available for routing between them.<br><b>Your goal:</b> the complete VLAN command set, with every pattern repeated enough times to stick. You will build the VLAN database three times, assign six access ports, configure <b>four separate trunk ends</b>, work through every single form of the allowed-VLAN list, and finish with three router subinterfaces. Then you will test a full connectivity matrix to prove each VLAN is genuinely isolated until the router says otherwise.`,
+  spec: [
+    { d: 'SW1, SW2 and SW3', r: [
+      'VLANs <b>10 ENGINEERING</b>, <b>20 SALES</b> and <b>30 GUEST</b> on all three switches.',
+      'All three in VTP mode <b>transparent</b>, domain <b>NETDRILL</b>.',
+      'On <b>SW1</b> only: create a temporary VLAN <b>99</b> and then delete it again.',
+    ] },
+    { d: 'Access ports', r: [
+      'SW1: <b>F0/1</b> VLAN 10 with voice VLAN <b>150</b>, <b>F0/2</b> VLAN 20, <b>F0/3</b> VLAN 30.',
+      'SW1 <b>F0/4</b>: unused — parked in VLAN 30 and shut down.',
+      'SW2: <b>F0/1</b> VLAN 10, <b>F0/2</b> VLAN 20. SW3: <b>F0/1</b> VLAN 30.',
+    ] },
+    { d: 'Trunks — five ends in total', r: [
+      'Every trunk end is a <b>fixed</b> trunk with DTP disabled.',
+      'The four switch-to-switch ends use native VLAN <b>1001</b>.',
+      'SW1–SW2 carries exactly <b>10,20,30</b>. SW2–SW3 is pruned to <b>30</b> only, on both ends.',
+      'SW1\'s uplink to R1 carries all three data VLANs.',
+    ] },
+    { d: 'R1 — router on a stick', r: [
+      'Three tagged subinterfaces acting as the gateways: <b>10.0.10.1</b>, <b>10.0.20.1</b> and <b>10.0.30.1</b>, each /24.',
+    ] },
+    { t: 'Verification', r: [
+      'Same-VLAN traffic works across one trunk and across two.',
+      'Cross-VLAN traffic works in several directions through R1.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Build SW1\'s VLAN database, including one you will delete again',
       do: [
@@ -865,6 +947,27 @@ L({
   ],
   layout: { SW1: [65, 55], SW2: [160, 55], SW3: [255, 55], SW4: [350, 55], PC1: [65, 115], PC2: [350, 115] },
   intro: `<b>The situation:</b> four switches in a chain, each pair joined by <em>two</em> cables. Six cables of deliberate redundancy — and Spanning Tree would block half of them, wasting the money somebody spent on the second run.<br><b>Your goal:</b> take complete control of layer 2. Choose the root bridge deliberately for each VLAN instead of letting MAC addresses decide, protect every edge port, then bundle all three cable pairs so both links in each pair carry traffic — using <b>LACP on one pair, PAgP on the next and static ON mode on the third</b>, so you drill every protocol and every mode keyword in a single lab.`,
+  spec: [
+    { d: 'All four switches', r: [
+      'Named <b>SW1</b>-<b>SW4</b>, all running <b>Rapid PVST+</b>, all with VLANs <b>10 USERS</b> and <b>20 SERVERS</b>.',
+    ] },
+    { d: 'Spanning-tree roles', r: [
+      '<b>SW1</b>: root for VLAN <b>10</b> (priority <b>4096</b>) and secondary root for VLAN <b>20</b>.',
+      '<b>SW2</b>: root for VLAN <b>20</b> and secondary root for VLAN <b>10</b>.',
+      '<b>SW1 F0/1</b>: portfast and BPDU guard, per interface.',
+      '<b>SW4</b>: portfast and BPDU guard enabled <b>globally</b> instead.',
+      'Host ports on SW1 and SW4 in access VLAN 10; the spare port on each edge switch shut down.',
+    ] },
+    { d: 'Three EtherChannels, three different protocols', r: [
+      'SW1 ↔ SW2 (<b>channel-group 1</b>): LACP — one side active, the other passive.',
+      'SW2 ↔ SW3 (<b>channel-group 2</b>): PAgP — one side desirable, the other auto.',
+      'SW3 ↔ SW4 (<b>channel-group 3</b>): static <b>ON</b> at both ends.',
+      'Every member port must be trunked and allowed VLANs 10,20 <b>before</b> bundling, and all six Port-channel interfaces configured as trunks allowing 10,20.',
+    ] },
+    { t: 'Verification', r: [
+      'All three bundles actually form, <b>PC1</b> reaches <b>PC2</b> (10.0.10.12), and all four switches are saved.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Read spanning tree on all four switches before touching anything',
       do: [
@@ -1125,6 +1228,28 @@ L({
     for (const r of ['R1', 'R2', 'R3', 'R4']) topo.devs[r].hostname = r;
   },
   intro: `<b>The situation:</b> four routers with three PC networks between them, every interface already addressed. Each router can reach its direct neighbours and nothing else — the classic starting point.<br><b>Your goal:</b> every flavour of static route there is, typed enough times to become reflex. Next-hop and exit-interface forms, more than a dozen individual routes, a backup route that only activates on failure, host routes, a summary route replacing several specifics, a default route, and a demonstration of longest prefix match you can watch in a traceroute. Then the whole exercise again in IPv6.`,
+  spec: [
+    { d: 'All four routers', r: [
+      'A <b>/32</b> loopback identity each: <b>1.1.1.1</b>, <b>2.2.2.2</b>, <b>3.3.3.3</b>, <b>4.4.4.4</b>.',
+    ] },
+    { d: 'IPv4 static routing — a different technique per router', r: [
+      '<b>R1</b>: five <b>next-hop</b> statics — the two remote LANs plus all three remote loopbacks.',
+      '<b>R2</b> (the hub): six statics pointing at three different next hops.',
+      '<b>R3</b>: a single <b>default route</b> instead of individual routes.',
+      '<b>R4</b>: one <b>summary</b> route, <b>10.0.0.0/16</b>, replacing the two specific routes it started with.',
+      '<b>R1</b> also needs a <b>floating</b> backup to <b>10.0.3.0/24</b> over the direct R1–R3 link, distance <b>200</b>, which must NOT be installed while the primary path is up.',
+    ] },
+    { d: 'IPv6 — R1, R2 and R3', r: [
+      'IPv6 forwarding enabled on all three.',
+      'The R1–R2 link addressed <b>2001:db8:12::1/64</b> and <b>::2/64</b>, with link-locals pinned to <b>FE80::1</b> and <b>FE80::2</b>.',
+      'R1\'s LAN addressed manually as <b>2001:db8:1::1/64</b>; R1 <b>G0/2</b> gets a link-local only, no global address.',
+      'R3\'s LAN uses prefix <b>2001:db8:3::/64</b> with the host half derived from the MAC.',
+      'Static IPv6 routes on R1 and R2, and an IPv6 <b>default route</b> on R3.',
+    ] },
+    { t: 'Verification', r: [
+      'All three PC networks reach each other, R1 reaches every loopback, and all four routers are saved.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Give all four routers a loopback identity',
       do: [
@@ -1392,6 +1517,27 @@ L({
     topo.devs.ISP.staticRoutes.push({ net: '10.0.0.0', mask: '255.0.0.0', via: '203.0.113.1', ad: 1 });
   },
   intro: `<b>The situation:</b> a small enterprise — two edge routers sharing a user LAN, a core router, a remote-site router, and an ISP connection at the far end. Every interface is addressed, but no router knows about any network except the ones it touches.<br><b>Your goal:</b> make the whole thing both <em>self-learning</em> and <em>fault-tolerant</em>. OSPF discovers every route with not one static route typed, a default route from the ISP edge is injected into the whole domain, and HSRP gives the PC a gateway address that survives either edge router failing. You will enable OSPF four times using <b>both</b> methods, tune every value CCNA asks about, and build two HSRP groups with reversed priorities.`,
+  spec: [
+    { d: 'OSPF — process 1, area 0, on R1, R2, R3 and R4', r: [
+      'Unique router IDs <b>1.1.1.1</b> to <b>4.4.4.4</b>.',
+      '<b>R1</b> advertises its LAN, its link to R3 and its loopback with <b>network statements</b>.',
+      '<b>R2</b> and <b>R4</b> must enable OSPF on their link using the <b>interface</b> command rather than a network statement.',
+      '<b>R1</b> and <b>R2</b> both use <b>passive-interface default</b>, with only their link to the core re-enabled.',
+      '<b>R3</b> (the core) advertises all three links and its loopback.',
+      'Reference bandwidth <b>10000</b> on all four routers.',
+      '<b>R1</b>: cost <b>10</b>, OSPF priority <b>100</b> and network type <b>point-to-point</b> on G0/1 — and R3 must match that type on its end.',
+      '<b>R1</b> limited to <b>2</b> equal-cost paths.',
+      '<b>R4</b>: a static default route to the ISP, injected into OSPF — but the ISP link itself must NOT be advertised.',
+    ] },
+    { d: 'HSRP version 2 on R1 and R2', r: [
+      'Group <b>1</b> sharing <b>10.0.0.1</b>, with <b>R1</b> preferred and preempt enabled.',
+      'Group <b>2</b> sharing <b>10.0.0.254</b>, with <b>R2</b> preferred and preempt enabled.',
+    ] },
+    { t: 'Verification', r: [
+      'All three core adjacencies are FULL, and none forms across the passive user LAN.',
+      'PC1 reaches both virtual gateways and the remote site; both PCs reach <b>8.8.8.8</b> via the injected default. Save all four internal routers.',
+    ] },
+  ],
   tasks: [
     { t: 'PHASE 1 — Start OSPF on R1 and advertise its three networks',
       do: [
