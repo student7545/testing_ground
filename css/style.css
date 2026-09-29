@@ -440,3 +440,10 @@ footer.site a { color: var(--text-dim); text-decoration: underline; }
 .specgroup ul { margin: 0; padding-left: 20px; }
 .specgroup li { margin: 5px 0; font-size: 13.5px; line-height: 1.55; }
 .smallnote { font-size: 12.5px; margin-top: 14px; }
+
+.topbar .build {
+  flex: none; margin-left: 10px; padding: 2px 8px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+  color: var(--text-dim); background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 999px;
+}
