@@ -156,7 +156,7 @@ function pcNetDhcp(topo, dev) {
   const ifc = Object.values(dev.ifaces)[0];
   const eps = ND.l2Endpoints(topo, dev, ifc);
   for (const ep of eps) {
-    const cand = serverFor(ep.dev, null);
+    const cand = serverFor(ep.dev, null, ep.ifc);
     if (cand) return cand;
     // relay via ip helper-address
     if (ep.ifc.helpers && ep.ifc.helpers.length && ep.ifc.ip) {
@@ -170,13 +170,18 @@ function pcNetDhcp(topo, dev) {
     }
   }
   return { ip: null, mask: null, gw: null };
-  function serverFor(srv, giaddr) {
+  function serverFor(srv, giaddr, facing) {
     if (srv.type === 'pc' || !srv.dhcp) return null;
     for (const pool of Object.values(srv.dhcp.pools)) {
       if (!pool.network) continue;
-      // pool must match the relay interface subnet, or (no relay) a directly-connected subnet of the server
+      // Choosing the pool: a relayed request carries the relay interface's address
+      // (giaddr) and the pool must match it. A request heard directly must match the
+      // subnet of the very interface it arrived on — otherwise a router serving several
+      // VLANs would answer every client from whichever pool happens to be listed first.
       if (giaddr) {
         if (!ND.sameSubnet(giaddr.addr, pool.network, pool.mask)) continue;
+      } else if (facing && facing.ip) {
+        if (!ND.sameSubnet(facing.ip.addr, pool.network, pool.mask)) continue;
       } else {
         const local = Object.values(srv.ifaces).some(i => i.ip && ND.sameSubnet(i.ip.addr, pool.network, pool.mask));
         if (!local) continue;

@@ -45,10 +45,12 @@ function buildTopo(lab) {
 const TIERS = [
   { key: 'core', label: 'Core labs', note: 'one topic each' },
   { key: 'deep', label: 'Comprehensive', note: 'every command, in depth' },
+  { key: 'mega', label: 'Scenario builds', note: 'a whole site, from empty configs' },
 ];
 const VOLUMES = [
   { n: 1, title: 'Volume 1', sub: 'Fundamentals, Switching, Routing & ACLs', note: 'JITL Days 1\u201334 \u00b7 Acing the CCNA Exam Vol 1' },
   { n: 2, title: 'Volume 2', sub: 'Services, Security, Architectures, Wireless & Automation', note: 'JITL Days 35+ \u00b7 Acing the CCNA Exam Vol 2' },
+  { n: 3, title: 'Mega Labs', sub: 'Five full site builds, end to end', note: 'Everything at once \u00b7 one evening each' },
 ];
 
 function shell() {
@@ -104,6 +106,27 @@ function renderSidebar(activeId) {
       }
     }
   }
+  const exams = ND.EXAMS || [];
+  if (exams.length) {
+    const taken = exams.filter(x => examBest(x.id) != null).length;
+    list.appendChild(el('div', 'navsection',
+      `<span class="navsection-title">Exams</span>` +
+      `<span class="navsection-count">${taken}/${exams.length}</span>` +
+      `<span class="navsection-sub">Comprehension \u00b7 Boson-style, graded by domain</span>`));
+    const hub = el('button', 'navrow' + (activeId === 'exams' ? ' active' : ''),
+      `<span class="navday">All</span><span class="navtitle">Exam hub &amp; weak areas</span>`);
+    hub.addEventListener('click', () => { location.hash = '#/exams'; closeNav(); });
+    list.appendChild(hub);
+    for (const x of exams) {
+      const best = examBest(x.id);
+      const row = el('button', 'navrow' + (activeId === 'exam:' + x.id ? ' active' : ''),
+        `<span class="navday">${x.short || 'Exam'}</span><span class="navtitle">${x.name}</span>` +
+        (best != null ? `<span class="navreps" title="best score">${best}%</span>` : ''));
+      row.addEventListener('click', () => { location.hash = '#/exam/' + x.id; closeNav(); });
+      list.appendChild(row);
+    }
+  }
+
   nav.appendChild(list);
 }
 
@@ -149,8 +172,15 @@ function route() {
   const m = h.match(/^#\/lab\/(.+)$/);
   if (m) {
     const lab = ND.LABS.find(l => l.id === m[1]);
-    if (lab) { renderSidebar(lab.id); return renderLab(lab); }
+    if (lab) { stopExamTimer(); renderSidebar(lab.id); return renderLab(lab); }
   }
+  const me = h.match(/^#\/exam\/(.+)$/);
+  if (me) {
+    const exam = (ND.EXAMS || []).find(x => x.id === me[1]);
+    if (exam) { renderSidebar('exam:' + exam.id); return startExam(exam); }
+  }
+  if (h === '#/exams') { stopExamTimer(); renderSidebar('exams'); return renderExamHub(); }
+  stopExamTimer();
   renderSidebar(null);
   renderHome();
 }
@@ -199,10 +229,17 @@ function renderHome() {
 }
 
 /* ---------- lab view ---------- */
-function setTopbar(lab) {
+function setTopbar(lab, opts) {
   const bar = $('#topbar-actions');
   bar.innerHTML = '';
   const mode = currentMode();
+  if (opts && opts.plain) {
+    /* exam hub: the lab mode picker means nothing here */
+    const home = el('button', 'btn', '\u2190 Overview');
+    home.addEventListener('click', () => { location.hash = ''; });
+    bar.appendChild(home);
+    return;
+  }
   if (!lab) {
     /* overview page: the picker still sets the mode the next lab opens in */
     const seg0 = el('div', 'modeseg');
@@ -710,6 +747,287 @@ function runChecks() {
   } else {
     banner.innerHTML = '';
   }
+}
+
+/* ================= exam mode ================= */
+/* Boson-style multiple-choice exams. Comprehension, not typing: every question
+   is scenario- or output-based, graded per CCNA blueprint domain so the result
+   tells you which topic to go back to. */
+
+let E = null;            // {exam, idx, answers, flags, started, submitted, result}
+let examTimer = null;
+
+const examResults = () => store.get('examResults', {});
+function examBest(id) { const r = examResults()[id]; return r && r.attempts && r.attempts.length ? Math.max(...r.attempts.map(a => a.pct)) : null; }
+function saveExamResult(id, res) {
+  const all = examResults();
+  const rec = all[id] || { attempts: [] };
+  rec.attempts.push({ pct: res.pct, at: Date.now(), byDomain: res.byDomain.map(d => ({ d: d.d, ok: d.ok, n: d.n })) });
+  rec.attempts = rec.attempts.slice(-10);
+  all[id] = rec;
+  store.set('examResults', all);
+}
+function stopExamTimer() { if (examTimer) { clearInterval(examTimer); examTimer = null; } }
+
+function fmtClock(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec / 60), s2 = sec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s2).padStart(2, '0')}`;
+}
+
+/* ---- hub ---- */
+function domainRollup() {
+  /* every attempt of every exam, added up per domain */
+  const agg = {};
+  for (const rec of Object.values(examResults())) {
+    for (const a of rec.attempts || []) {
+      for (const d of a.byDomain || []) {
+        agg[d.d] = agg[d.d] || { d: d.d, ok: 0, n: 0 };
+        agg[d.d].ok += d.ok; agg[d.d].n += d.n;
+      }
+    }
+  }
+  return Object.values(agg).sort((a, b) => (a.ok / a.n) - (b.ok / b.n));
+}
+
+function barHtml(ok, n) {
+  const pct = n ? Math.round(ok * 100 / n) : 0;
+  const cls = pct >= 85 ? 'good' : pct >= 70 ? 'ok' : 'bad';
+  return `<span class="dombar"><span class="dombar-fill ${cls}" style="width:${pct}%"></span></span><span class="dompct ${cls}">${pct}%</span>`;
+}
+
+function renderExamHub() {
+  S = null; E = null;
+  const app = $('#content');
+  app.innerHTML = '';
+  setTopbar(null, { plain: true });
+  const wrap = el('div', 'wrap');
+  wrap.appendChild(el('section', 'hero', `
+    <h1>Exam mode</h1>
+    <p>Five Boson-style practice exams built for <b>comprehension</b> rather than typing. Every question is a scenario, a piece of real
+    command output, or a design decision — the kind of thinking the written exam tests and a lab cannot.</p>
+    <p>Each exam is graded against the six CCNA blueprint domains, so the result does not just give you a score: it tells you
+    <b>which topic let you down</b> and which lab to go back to.</p>`));
+
+  const roll = domainRollup();
+  if (roll.length) {
+    let h = `<h2>Your weakest areas so far</h2><p class="dim">Across every attempt of every exam.</p><div class="domlist">`;
+    for (const d of roll) h += `<div class="domrow"><span class="domname">${d.d}</span>${barHtml(d.ok, d.n)}<span class="domn">${d.ok}/${d.n}</span></div>`;
+    h += `</div>`;
+    wrap.appendChild(el('section', 'card', h));
+  }
+
+  const list = el('section', 'card', `<h2>Practice exams</h2>`);
+  for (const x of (ND.EXAMS || [])) {
+    const rec = examResults()[x.id];
+    const best = examBest(x.id);
+    const last = rec && rec.attempts.length ? rec.attempts[rec.attempts.length - 1].pct : null;
+    const row = el('div', 'examrow', `
+      <div class="examinfo">
+        <div class="examname">${x.name}</div>
+        <div class="examblurb">${x.blurb}</div>
+        <div class="exammeta">${x.qs.length} questions · ${x.minutes} minutes · pass mark ${x.pass}%</div>
+      </div>
+      <div class="examscore">${best != null ? `<span class="exambest ${best >= x.pass ? 'good' : 'bad'}">${best}%</span><span class="examlast">best · last ${last}%</span>` : '<span class="examlast">not attempted</span>'}</div>`);
+    const go = el('button', 'btn primary', best != null ? 'Retake' : 'Start exam');
+    go.addEventListener('click', () => { location.hash = '#/exam/' + x.id; });
+    row.appendChild(go);
+    list.appendChild(row);
+  }
+  wrap.appendChild(list);
+  app.appendChild(wrap);
+}
+
+/* ---- runner ---- */
+function startExam(exam) {
+  stopExamTimer();
+  if (!E || E.exam !== exam || E.submitted) {
+    E = { exam, idx: 0, answers: {}, flags: new Set(), started: Date.now(), submitted: false, result: null };
+  }
+  renderExamRunner();
+}
+
+function examTopbar() {
+  const bar = $('#topbar-actions');
+  bar.innerHTML = '';
+  const out = el('button', 'btn', '← Exams');
+  out.addEventListener('click', () => { if (!E || E.submitted || confirm('Leave this exam? Your answers will be lost.')) { stopExamTimer(); E = null; location.hash = '#/exams'; } });
+  const clock = el('span', 'examclock');
+  clock.id = 'examclock';
+  bar.append(out, clock);
+}
+
+function renderExamRunner() {
+  const app = $('#content');
+  app.innerHTML = '';
+  examTopbar();
+  const exam = E.exam;
+  const q = exam.qs[E.idx];
+  const multi = q.a.length > 1;
+  const chosen = E.answers[E.idx] || [];
+
+  const wrap = el('div', 'wrap examwrap');
+  wrap.appendChild(el('div', 'labtop', `<span class="day">${exam.short || 'Exam'}</span><h1>${exam.name}</h1>
+    <span class="repbadge">${E.idx + 1} / ${exam.qs.length}</span><span class="spacer"></span>`));
+
+  const qcard = el('section', 'card qcard');
+  qcard.innerHTML = `<div class="qhead"><span class="qdomain">${q.d}</span>${q.lab ? `<span class="qlabhint">related lab: ${(ND.LABS.find(l => l.id === q.lab) || {}).title || q.lab}</span>` : ''}</div>
+    <div class="qtext">${q.q}</div>
+    <div class="qhint">${multi ? `Choose <b>${q.a.length}</b> answers.` : 'Choose <b>one</b> answer.'}</div>`;
+  const opts = el('div', 'opts');
+  q.opts.forEach((o, i) => {
+    const on = chosen.includes(i);
+    const b = el('button', 'opt' + (on ? ' on' : ''), `<span class="optmark">${String.fromCharCode(65 + i)}</span><span class="opttext">${o}</span>`);
+    b.addEventListener('click', () => {
+      let cur = (E.answers[E.idx] || []).slice();
+      if (multi) {
+        cur = cur.includes(i) ? cur.filter(x => x !== i) : cur.concat(i);
+        if (cur.length > q.a.length) cur.shift();
+      } else {
+        cur = [i];
+      }
+      E.answers[E.idx] = cur;
+      renderExamRunner();
+    });
+    opts.appendChild(b);
+  });
+  qcard.appendChild(opts);
+  wrap.appendChild(qcard);
+
+  /* nav row */
+  const navrow = el('div', 'examnav');
+  const prev = el('button', 'btn', '← Previous');
+  prev.disabled = E.idx === 0;
+  prev.addEventListener('click', () => { E.idx--; renderExamRunner(); });
+  const flag = el('button', 'btn' + (E.flags.has(E.idx) ? ' primary' : ''), E.flags.has(E.idx) ? 'Flagged' : 'Flag for review');
+  flag.addEventListener('click', () => { if (E.flags.has(E.idx)) E.flags.delete(E.idx); else E.flags.add(E.idx); renderExamRunner(); });
+  const next = el('button', 'btn', 'Next →');
+  next.disabled = E.idx === exam.qs.length - 1;
+  next.addEventListener('click', () => { E.idx++; renderExamRunner(); });
+  navrow.append(prev, flag, next);
+  wrap.appendChild(navrow);
+
+  /* palette + submit */
+  const answered = Object.keys(E.answers).length;
+  const pal = el('section', 'card', `<div class="ctlrow"><h3>Questions</h3><span class="dim">${answered} of ${exam.qs.length} answered</span></div>`);
+  const grid = el('div', 'palette');
+  exam.qs.forEach((_, i) => {
+    const b = el('button', 'palbtn' + (i === E.idx ? ' cur' : '') + (E.answers[i] ? ' done' : '') + (E.flags.has(i) ? ' flag' : ''), String(i + 1));
+    b.addEventListener('click', () => { E.idx = i; renderExamRunner(); });
+    grid.appendChild(b);
+  });
+  pal.appendChild(grid);
+  const sub = el('button', 'btn danger', 'Submit exam & grade');
+  sub.addEventListener('click', () => {
+    if (answered < exam.qs.length && !confirm(`${exam.qs.length - answered} question(s) are unanswered and will be marked wrong. Submit anyway?`)) return;
+    submitExam();
+  });
+  pal.appendChild(sub);
+  wrap.appendChild(pal);
+
+  app.appendChild(wrap);
+
+  /* countdown */
+  stopExamTimer();
+  const tick = () => {
+    const left = exam.minutes * 60 - (Date.now() - E.started) / 1000;
+    const c = $('#examclock');
+    if (!c) return;
+    c.textContent = left > 0 ? fmtClock(left) : 'time up';
+    c.classList.toggle('low', left < 300);
+    if (left <= 0) { stopExamTimer(); submitExam(); }
+  };
+  tick();
+  examTimer = setInterval(tick, 1000);
+}
+
+/* ---- grading ---- */
+function submitExam() {
+  stopExamTimer();
+  const exam = E.exam;
+  const dom = {};
+  const detail = [];
+  let correct = 0;
+  exam.qs.forEach((q, i) => {
+    const got = (E.answers[i] || []).slice().sort((a, b) => a - b);
+    const want = q.a.slice().sort((a, b) => a - b);
+    const ok = got.length === want.length && got.every((v, k) => v === want[k]);
+    if (ok) correct++;
+    dom[q.d] = dom[q.d] || { d: q.d, ok: 0, n: 0, labs: [] };
+    dom[q.d].n++;
+    if (ok) dom[q.d].ok++;
+    else if (q.lab && !dom[q.d].labs.includes(q.lab)) dom[q.d].labs.push(q.lab);
+    detail.push({ i, q, got, want, ok });
+  });
+  const pct = Math.round(correct * 100 / exam.qs.length);
+  E.submitted = true;
+  E.result = { pct, correct, byDomain: Object.values(dom).sort((a, b) => (a.ok / a.n) - (b.ok / b.n)), detail,
+    mins: Math.round((Date.now() - E.started) / 60000) };
+  saveExamResult(exam.id, E.result);
+  renderExamResult();
+  renderSidebar('exam:' + exam.id);
+}
+
+function renderExamResult() {
+  const app = $('#content');
+  app.innerHTML = '';
+  examTopbar();
+  const { exam, result } = E;
+  const passed = result.pct >= exam.pass;
+  const wrap = el('div', 'wrap examwrap');
+
+  wrap.appendChild(el('section', 'card scorecard', `
+    <div class="scorebig ${passed ? 'good' : 'bad'}">${result.pct}%</div>
+    <div class="scoreside">
+      <h2>${passed ? 'Pass' : 'Below the pass mark'}</h2>
+      <p class="dim">${result.correct} of ${exam.qs.length} correct · pass mark ${exam.pass}% · finished in ${result.mins} min</p>
+    </div>`));
+
+  let dh = `<h2>Score by CCNA domain</h2><p class="dim">This is the part that matters — the overall number only tells you whether you passed.</p><div class="domlist">`;
+  for (const d of result.byDomain) dh += `<div class="domrow"><span class="domname">${d.d}</span>${barHtml(d.ok, d.n)}<span class="domn">${d.ok}/${d.n}</span></div>`;
+  dh += `</div>`;
+  wrap.appendChild(el('section', 'card', dh));
+
+  const weak = result.byDomain.filter(d => d.ok / d.n < 0.7);
+  if (weak.length) {
+    let wh = `<h2>Where you are weak</h2><p class="dim">Anything below 70%. Work the listed labs, then retake this exam.</p><ul class="weaklist">`;
+    for (const d of weak) {
+      const labs = d.labs.map(id => ND.LABS.find(l => l.id === id)).filter(Boolean);
+      wh += `<li><b>${d.d}</b> — ${Math.round(d.ok * 100 / d.n)}%`;
+      if (labs.length) wh += `<div class="weaklabs">${labs.map(l => `<a href="#/lab/${l.id}">${l.day} · ${l.title}</a>`).join('')}</div>`;
+      wh += `</li>`;
+    }
+    wh += `</ul>`;
+    wrap.appendChild(el('section', 'card weakcard', wh));
+  } else {
+    wrap.appendChild(el('section', 'card', `<h2>No weak areas</h2><p class="dim">Every domain scored 70% or better. Retake it in a week and see if it holds.</p>`));
+  }
+
+  let rh = `<h2>Question review</h2><p class="dim">Every question, your answer, the right answer and why.</p>`;
+  for (const r of result.detail) {
+    const lab = r.q.lab ? ND.LABS.find(l => l.id === r.q.lab) : null;
+    rh += `<div class="review ${r.ok ? 'ok' : 'no'}">
+      <div class="qhead"><span class="revmark">${r.ok ? '✓' : '✗'}</span><span class="qdomain">${r.q.d}</span><span class="dim">Q${r.i + 1}</span></div>
+      <div class="qtext">${r.q.q}</div>
+      <ul class="revopts">${r.q.opts.map((o, i) => {
+        const cls = r.want.includes(i) ? 'right' : (r.got.includes(i) ? 'wrong' : '');
+        return `<li class="${cls}"><span class="optmark">${String.fromCharCode(65 + i)}</span>${o}</li>`;
+      }).join('')}</ul>
+      <div class="revwhy"><b>Why:</b> ${r.q.why}</div>
+      ${lab ? `<div class="revlab">Revise with <a href="#/lab/${lab.id}">${lab.day} · ${lab.title}</a></div>` : ''}
+    </div>`;
+  }
+  wrap.appendChild(el('section', 'card', rh));
+
+  const again = el('button', 'btn primary', 'Retake this exam');
+  again.addEventListener('click', () => { E = null; startExam(exam); });
+  const hub = el('button', 'btn', 'Back to the exam hub');
+  hub.addEventListener('click', () => { E = null; location.hash = '#/exams'; });
+  const row = el('div', 'examnav');
+  row.append(again, hub);
+  wrap.appendChild(row);
+
+  app.appendChild(wrap);
 }
 
 /* ---------- boot ---------- */
