@@ -708,7 +708,7 @@ function handleKey(e, input) {
   } else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
     if (dev.type !== 'pc' && !['exec', 'priv'].includes(s.mode)) {
-      s.mode = 'priv'; s.ifaceRange = null; s.line = null; s.vlan = null; s.pool = null; s.acl = null;
+      s.mode = 'priv'; s.ifaceRange = null; s.rangeMode = false; s.line = null; s.vlan = null; s.pool = null; s.acl = null;
       push(ND.promptFor(dev));
       paintTerm(); focusInput();
     }

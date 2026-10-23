@@ -5,6 +5,7 @@ const ND = window.ND;
 
 ND.PROMPT_SUFFIX = {
   exec: '>', priv: '#', conf: '(config)#', if: '(config-if)#', subif: '(config-subif)#',
+  ifrange: '(config-if-range)#',
   line: '(config-line)#', vlan: '(config-vlan)#', router: '(config-router)#',
   dhcp: '(dhcp-config)#', 'acl-std': '(config-std-nacl)#', 'acl-ext': '(config-ext-nacl)#',
 };
@@ -15,6 +16,7 @@ ND.promptFor = function (dev) {
   if (s.pendingPrompt) return s.pendingPrompt.text;
   let mode = s.mode;
   if (mode === 'if' && s.ifaceRange && s.ifaceRange.length === 1 && s.ifaceRange[0].name.includes('.')) mode = 'subif';
+  else if (mode === 'if' && s.ifaceRange && s.rangeMode) mode = 'ifrange';
   return dev.hostname + (ND.PROMPT_SUFFIX[mode] || '>');
 };
 ND.isPasswordPrompt = dev => dev.type !== 'pc' && !!dev.sess.pendingAuth;
@@ -88,6 +90,29 @@ function resolve(specs, toks) {
   return { err: 'invalid' };
 }
 
+/* IOS prints a caret under the first token it could not parse, and the error
+   message refers to it by name. Finding that token means asking how long a
+   prefix of the input still matches the start of SOME command: the first
+   prefix that matches nothing is where parsing stopped. */
+function firstBadToken(specs, toks) {
+  for (let n = 1; n <= toks.length; n++) {
+    const pre = toks.slice(0, n);
+    if (!specs.some(spec => matchSpec(spec.pat, pre))) return n - 1;
+  }
+  return toks.length - 1;
+}
+
+/* Character offset of the nth whitespace-separated token in the raw line. */
+function tokenOffset(line, n) {
+  const re = /\S+/g;
+  let m, i = 0;
+  while ((m = re.exec(line))) {
+    if (i === n) return m.index;
+    i++;
+  }
+  return line.length;
+}
+
 /* ---------- registry ---------- */
 const REG = { exec: [], priv: [], conf: [], if: [], line: [], vlan: [], router: [], dhcp: [], 'acl-std': [], 'acl-ext': [], pc: [] };
 function cmd(modes, pattern, desc, run) {
@@ -135,8 +160,9 @@ ND.execLine = function (topo, dev, rawLine, out) {
 
   // "do" from any config mode
   if (dev.type !== 'pc' && !['exec', 'priv'].includes(s.mode) && toks[0].toLowerCase() === 'do' && toks.length > 1) {
-    const r = resolve(REG.priv.concat(REG.exec), toks.slice(1));
-    if (r.err) return err(r.err, out, line);
+    const doSpecs = REG.priv.concat(REG.exec);
+    const r = resolve(doSpecs, toks.slice(1));
+    if (r.err) return err(r.err, out, line, caretCol(dev, line, doSpecs, toks.slice(1), 1));
     r.spec.run({ topo, dev, out, s }, r.caps);
     return;
   }
@@ -153,19 +179,28 @@ ND.execLine = function (topo, dev, rawLine, out) {
       return;
     }
   }
-  if (r.err) return err(r.err, out, line);
+  if (r.err) {
+    const tried = ['exec', 'priv', 'conf'].includes(s.mode) || dev.type === 'pc' ? specs : specs.concat(REG.conf);
+    return err(r.err, out, line, caretCol(dev, line, tried, toks, 0));
+  }
   r.spec.run({ topo, dev, out, s }, r.caps);
 };
 
-function err(kind, out, line) {
+/* The terminal echoes prompt + line on one row, so the caret has to clear the
+   prompt as well as the part of the command that parsed cleanly. */
+function caretCol(dev, line, specs, toks, tokShift) {
+  return ND.promptFor(dev).length + tokenOffset(line, firstBadToken(specs, toks) + tokShift);
+}
+
+function err(kind, out, line, caretCol) {
   if (kind === 'ambiguous') out(`% Ambiguous command:  "${line.trim()}"`, 'err');
   else if (kind === 'incomplete') out('% Incomplete command.', 'err');
-  else out(`% Invalid input detected at '^' marker.`, 'err');
+  else out(`${' '.repeat(Math.max(0, caretCol || 0))}^\n% Invalid input detected at '^' marker.`, 'err');
 }
 
 function exitToConf(dev) {
   const s = dev.sess;
-  s.mode = 'conf'; s.iface = null; s.ifaceRange = null; s.line = null; s.vlan = null; s.pool = null; s.acl = null;
+  s.mode = 'conf'; s.iface = null; s.ifaceRange = null; s.rangeMode = false; s.line = null; s.vlan = null; s.pool = null; s.acl = null;
 }
 
 /* ---------- help (?) ---------- */

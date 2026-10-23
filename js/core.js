@@ -133,7 +133,7 @@ ND.makeDevice = function (opts) {
     // PC-only network config
     pcCfg: opts.type === 'pc' ? { ip: null, mask: null, gw: null, dhcp: !!opts.dhcp, dns: null } : null,
     // console session state (per device)
-    sess: { mode: 'exec', iface: null, ifaceRange: null, line: null, vlan: null, pool: null, acl: null, history: [], hIdx: -1, pendingAuth: null, moreBuf: null },
+    sess: { mode: 'exec', iface: null, ifaceRange: null, rangeMode: false, line: null, vlan: null, pool: null, acl: null, history: [], hIdx: -1, pendingAuth: null, moreBuf: null },
   };
   if (opts.hostname) dev.hostname = opts.hostname;
   if (opts.type === 'switch') { dev.vlans[1002] = { name: 'fddi-default' }; dev.vlans[1003] = { name: 'token-ring-default' }; dev.vlans[1004] = { name: 'fddinet-default' }; dev.vlans[1005] = { name: 'trnet-default' }; }

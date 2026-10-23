@@ -12,8 +12,8 @@ const eachIf = (c, fn) => { for (const i of (c.s.ifaceRange || [])) fn(i); };
 /* ---------- mode exits ---------- */
 const SUB = ['if', 'line', 'vlan', 'router', 'dhcp', 'acl-std', 'acl-ext'];
 cmd(['conf'], 'exit', 'Exit from configure mode', c => { c.s.mode = 'priv'; });
-cmd(SUB, 'exit', 'Exit from current mode', c => { c.s.mode = 'conf'; c.s.ifaceRange = null; c.s.line = null; c.s.vlan = null; c.s.pool = null; c.s.acl = null; });
-cmd(['conf', ...SUB], 'end', 'Exit from configure mode', c => { c.s.mode = 'priv'; c.s.ifaceRange = null; c.s.line = null; c.s.vlan = null; c.s.pool = null; c.s.acl = null; });
+cmd(SUB, 'exit', 'Exit from current mode', c => { c.s.mode = 'conf'; c.s.ifaceRange = null; c.s.rangeMode = false; c.s.line = null; c.s.vlan = null; c.s.pool = null; c.s.acl = null; });
+cmd(['conf', ...SUB], 'end', 'Exit from configure mode', c => { c.s.mode = 'priv'; c.s.ifaceRange = null; c.s.rangeMode = false; c.s.line = null; c.s.vlan = null; c.s.pool = null; c.s.acl = null; });
 
 /* ---------- global config ---------- */
 cmd(['conf'], 'hostname WORD', "Set system's network name", (c, a) => { c.dev.hostname = a[0]; });
@@ -59,13 +59,13 @@ cmd(['conf'], 'line vty NUM', 'Virtual terminal', c => { c.s.mode = 'line'; c.s.
 cmd(['conf', 'if'], 'interface range REST', 'Interface range command', (c, a) => {
   const list = ND.parseRange(c.dev, a[0]);
   if (!list) return c.out('% Invalid input detected: bad interface range', 'err');
-  c.s.mode = 'if'; c.s.ifaceRange = list;
+  c.s.mode = 'if'; c.s.ifaceRange = list; c.s.rangeMode = true;
 });
 cmd(['conf', 'if'], 'interface REST', 'Select an interface to configure', (c, a) => {
   const ifc = ND.getOrCreateIface(c.dev, a[0].replace(/\s+/g, ''));
   if (!ifc) return c.out(`% Invalid input detected at '^' marker.`, 'err');
   const created = !c.dev.ifaces[ifc.name];
-  c.s.mode = 'if'; c.s.ifaceRange = [ifc];
+  c.s.mode = 'if'; c.s.ifaceRange = [ifc]; c.s.rangeMode = false;
   if (/^Vlan/.test(ifc.name)) c.out(`%LINK-5-CHANGED: Interface ${ifc.name}, changed state to up`, 'sys');
 });
 
