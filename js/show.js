@@ -243,11 +243,19 @@ ND.showVlanBrief = function (topo, dev) {
 };
 
 /* ---------- show interfaces trunk ---------- */
+/* The Mode column reports the ADMINISTRATIVE mode you configured, not the
+   negotiated result -- the Status column already carries that. So a port left
+   to negotiate shows which side of DTP it is playing, desirable or auto. */
+function trunkAdminMode(i) {
+  if (i.swMode === 'trunk') return 'on';
+  if (i.swMode === 'dynamic') return i.dtp;
+  return 'off';
+}
 ND.showIntTrunk = function (topo, dev) {
   const trunks = Object.values(dev.ifaces).filter(i => /^(Gigabit|Fast|Ten|Ether|Port-channel)/.test(i.name) && !i.noSwitchport && ND.operMode(topo, dev, i) === 'trunk' && ND.ifaceUp(topo, dev, i) && !i.channelGroup);
   if (!trunks.length) return '';
   const L = [pad('Port', 12) + pad('Mode', 13) + pad('Encapsulation', 15) + pad('Status', 10) + 'Native vlan'];
-  for (const t of trunks) L.push(pad(ND.shortIface(t.name), 12) + pad(t.swMode === 'trunk' ? 'on' : 'auto', 13) + pad('802.1q', 15) + pad('trunking', 10) + t.nativeVlan);
+  for (const t of trunks) L.push(pad(ND.shortIface(t.name), 12) + pad(trunkAdminMode(t), 13) + pad('802.1q', 15) + pad('trunking', 10) + t.nativeVlan);
   L.push('', pad('Port', 12) + 'Vlans allowed on trunk');
   for (const t of trunks) L.push(pad(ND.shortIface(t.name), 12) + (t.allowed === null ? '1-4094' : ND.fmtVlanList(t.allowed)));
   L.push('', pad('Port', 12) + 'Vlans allowed and active in management domain');
