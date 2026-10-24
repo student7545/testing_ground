@@ -10,6 +10,17 @@ const ND = window.ND;
 ND.l2Endpoints = function (topo, dev, ifc) {
   const results = [];
   const seen = new Set();
+  /* The tree is the same for every port on a given VLAN, so work it out once
+     per walk rather than once per port. Declared up here because the flooding
+     helpers below are reached before the rest of this function runs. */
+  const stpCache = {};
+  function stpDiscards(sw, ifcName, vlan) {
+    if (!(vlan in stpCache)) stpCache[vlan] = ND.stpTopology(topo, vlan);
+    const t = stpCache[vlan];
+    if (!t) return false;
+    const e = t.roles.get(sw.id + '|' + ifcName);
+    return !!(e && e.sts === 'BLK');
+  }
 
   // what vlan does this endpoint emit on its physical wire?
   let tag = null; // null = untagged
@@ -61,6 +72,7 @@ ND.l2Endpoints = function (topo, dev, ifc) {
         if (!ND.allowedOnTrunk(l2, vlan)) return;
       }
       if (!d.vlans[vlan]) return; // vlan not created on this switch
+      if (stpDiscards(d, ifName, vlan)) return; // alternate port: discarding
       floodSwitch(d, vlan, ifName);
     } else {
       // router / PC / routed port: receives only untagged frames (subifs handled below)
@@ -100,6 +112,7 @@ ND.l2Endpoints = function (topo, dev, ifc) {
       let egressTag = null;
       if (mode === 'access') { if (outL2.accessVlan !== vlan) continue; egressTag = null; }
       else { if (!ND.allowedOnTrunk(outL2, vlan)) continue; egressTag = outL2.nativeVlan === vlan ? null : vlan; }
+      if (stpDiscards(sw, out.name, vlan)) continue; // alternate port: discarding
       const peer = ND.linkPeer(topo, sw, out.name);
       if (peer) arrive(peer.dev, peer.iface, egressTag);
     }
@@ -579,6 +592,121 @@ ND.stpRoot = function (topo, vlan) {
     if (!root || prio < root.prio || (prio === root.prio && mac < root.mac)) root = { dev, prio, mac };
   }
   return root;
+};
+
+/* Port cost by speed, from the modern (short) IEEE cost table. A bundle is one
+   logical port, and cheaper than a single member because it carries more. */
+ND.stpPortCost = function (name) {
+  if (/^TenGigabit/.test(name)) return 2;
+  if (/^Port-channel/.test(name)) return 3;
+  if (/^Gigabit/.test(name)) return 4;
+  if (/^Fast/.test(name)) return 19;
+  return 100;
+};
+
+/* Bridge ID: priority (plus the VLAN, the sys-id-ext) then MAC, as one
+   comparable string so that ties fall through to the address exactly as the
+   election does. */
+ND.stpBridgeId = function (dev, vlan) {
+  const prio = (dev.stp.prio[vlan] ?? 32768) + vlan;
+  const first = dev.ifaces[Object.keys(dev.ifaces)[0]];
+  const mac = first ? first.mac : 'ffff.ffff.ffff';
+  return { prio, mac, key: String(prio).padStart(6, '0') + '|' + mac };
+};
+
+/* The ports that take part in the tree for one VLAN. Bundle members are not
+   ports of their own here: the Port-channel stands in for all of them, which is
+   the whole reason an EtherChannel does not get half of itself blocked. */
+function stpLogicalPorts(topo, dev, vlan) {
+  const out = [], seenPo = new Set();
+  for (const ifc of Object.values(dev.ifaces)) {
+    if (!/^(Gigabit|Fast|Ten|Ether)/.test(ifc.name) || ifc.noSwitchport) continue;
+    if (!ND.ifaceUp(topo, dev, ifc)) continue;
+    const l2 = ND.l2Settings(dev, ifc);
+    const mode = ND.operMode(topo, dev, l2);
+    if (mode === 'routed') continue;
+    if (mode === 'access' ? l2.accessVlan !== vlan : !ND.allowedOnTrunk(l2, vlan)) continue;
+    if (!dev.vlans[vlan]) continue;
+    const peer = ND.linkPeer(topo, dev, ifc.name);
+    const po = ifc.channelGroup ? dev.ifaces['Port-channel' + ifc.channelGroup.id] : null;
+    if (po) {
+      if (seenPo.has(po.name)) { out.find(x => x.ifc === po).members.push(ifc.name); continue; }
+      seenPo.add(po.name);
+      out.push({ ifc: po, members: [ifc.name], cost: ND.stpPortCost(po.name), peer });
+    } else {
+      out.push({ ifc, members: [], cost: ND.stpPortCost(ifc.name), peer });
+    }
+  }
+  return out;
+}
+
+/* Build the spanning tree for one VLAN: cheapest path from every switch back to
+   the root, then a role for each port. Exactly one root port per non-root
+   switch, one designated port per segment, and whatever is left over is an
+   alternate port — which is the port that blocks and breaks the loop. */
+ND.stpTopology = function (topo, vlan) {
+  const root = ND.stpRoot(topo, vlan);
+  if (!root) return null;
+  const switches = Object.values(topo.devs).filter(d => d.type === 'switch' && d.vlans[vlan]);
+  if (!switches.some(d => d === root.dev)) return null;
+  const ports = {}, cost = {};
+  for (const d of switches) { ports[d.id] = stpLogicalPorts(topo, d, vlan); cost[d.id] = Infinity; }
+  cost[root.dev.id] = 0;
+
+  /* Relax until the costs settle: root path cost is the peer's cost plus the
+     cost of the port the BPDU arrived on, never the port it left by. */
+  for (let pass = 0; pass < switches.length; pass++) {
+    let changed = false;
+    for (const d of switches) {
+      for (const p of ports[d.id]) {
+        if (!p.peer || p.peer.dev.type !== 'switch' || cost[p.peer.dev.id] === undefined) continue;
+        const alt = cost[p.peer.dev.id] + p.cost;
+        if (alt < cost[d.id]) { cost[d.id] = alt; changed = true; }
+      }
+    }
+    if (!changed) break;
+  }
+
+  const roles = new Map();
+  for (const d of switches) {
+    const isRoot = d.id === root.dev.id;
+    let rp = null;
+    if (!isRoot) {
+      for (const p of ports[d.id]) {
+        if (!p.peer || p.peer.dev.type !== 'switch' || cost[p.peer.dev.id] === undefined) continue;
+        if (cost[p.peer.dev.id] + p.cost !== cost[d.id]) continue;
+        if (!rp) { rp = p; continue; }
+        const a = ND.stpBridgeId(p.peer.dev, vlan).key, b = ND.stpBridgeId(rp.peer.dev, vlan).key;
+        if (a < b || (a === b && p.ifc.name < rp.ifc.name)) rp = p;
+      }
+    }
+    for (const p of ports[d.id]) {
+      let role;
+      if (isRoot) role = 'Desg';
+      else if (p === rp) role = 'Root';
+      else if (!p.peer || p.peer.dev.type !== 'switch' || cost[p.peer.dev.id] === undefined) role = 'Desg';
+      else {
+        const mine = cost[d.id], theirs = cost[p.peer.dev.id];
+        if (mine < theirs) role = 'Desg';
+        else if (mine > theirs) role = 'Altn';
+        else role = ND.stpBridgeId(d, vlan).key < ND.stpBridgeId(p.peer.dev, vlan).key ? 'Desg' : 'Altn';
+      }
+      const entry = { role, sts: role === 'Altn' ? 'BLK' : 'FWD', cost: p.cost, name: p.ifc.name };
+      roles.set(d.id + '|' + p.ifc.name, entry);
+      /* members answer for the bundle, so a blocked Po blocks every member */
+      for (const m of p.members) roles.set(d.id + '|' + m, entry);
+    }
+  }
+  return { root, cost, roles, ports };
+};
+
+/* Is this port discarding for the VLAN? Used by the forwarding path, so that a
+   redundant link is genuinely unused rather than merely labelled that way. */
+ND.stpBlocked = function (topo, dev, ifcName, vlan) {
+  const t = ND.stpTopology(topo, vlan);
+  if (!t) return false;
+  const e = t.roles.get(dev.id + '|' + ifcName);
+  return !!(e && e.sts === 'BLK');
 };
 
 /* ============ NAT check (used by show + labs) ============ */

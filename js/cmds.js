@@ -501,25 +501,26 @@ show('show spanning-tree', 'Spanning tree topology', c => {
   const vlans = Object.keys(dev.vlans).map(Number).filter(v => v < 1002).sort((a, b) => a - b);
   for (const v of vlans) {
     const root = ND.stpRoot(c.topo, v);
+    const tree = ND.stpTopology(c.topo, v);
     const myPrio = (dev.stp.prio[v] ?? 32768) + v;
     const isRoot = root && root.dev === dev;
+    const rootCost = tree && Number.isFinite(tree.cost[dev.id]) ? tree.cost[dev.id] : 0;
     c.out(`VLAN${String(v).padStart(4, '0')}`);
     c.out(`  Spanning tree enabled protocol ${dev.stp.mode === 'rapid' ? 'rstp' : 'ieee'}`);
     c.out(`  Root ID    Priority    ${root ? root.prio : myPrio}`);
     c.out(`             Address     ${root ? root.mac : '0000.0000.0000'}`);
-    c.out(isRoot ? '             This bridge is the root' : `             Cost        4`);
+    c.out(isRoot ? '             This bridge is the root' : `             Cost        ${rootCost}`);
     c.out(`  Bridge ID  Priority    ${myPrio}  (priority ${dev.stp.prio[v] ?? 32768} sys-id-ext ${v})`);
     c.out('');
     c.out('Interface           Role Sts Cost      Prio.Nbr Type');
     c.out('------------------- ---- --- --------- -------- --------------------------------');
-    for (const i of Object.values(dev.ifaces)) {
-      if (!/^(Gigabit|Fast)/.test(i.name) || !ND.ifaceUp(c.topo, dev, i)) continue;
-      const mode = ND.operMode(c.topo, dev, i);
-      if (mode === 'access' && i.accessVlan !== v) continue;
-      if (mode === 'trunk' && !ND.allowedOnTrunk(i, v)) continue;
+    for (const p of (tree ? tree.ports[dev.id] || [] : [])) {
+      const i = p.ifc;
+      const e = tree.roles.get(dev.id + '|' + i.name) || { role: 'Desg', sts: 'FWD', cost: p.cost };
+      const mode = ND.operMode(c.topo, dev, ND.l2Settings(dev, i));
       const pf = i.stpPortfast || (dev.stp.portfastDefault && mode === 'access');
-      const role = isRoot ? 'Desg' : 'Root';
-      c.out(`${ND.shortIface(i.name).padEnd(20)}${role} FWD 4         128.${1 + Object.keys(dev.ifaces).indexOf(i.name)}    P2p${pf ? ' Edge' : ''}`);
+      const nbr = 1 + Object.keys(dev.ifaces).indexOf(p.members.length ? p.members[0] : i.name);
+      c.out(`${ND.shortIface(i.name).padEnd(20)}${e.role} ${e.sts} ${String(e.cost).padEnd(9)} 128.${nbr}    P2p${pf ? ' Edge' : ''}`);
     }
     c.out('');
   }
