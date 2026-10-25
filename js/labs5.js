@@ -1035,6 +1035,7 @@ L({
     { d: 'All three routers', r: [
       'OSPF process <b>1</b>, area <b>0</b>, with router IDs <b>1.1.1.1</b>, <b>2.2.2.2</b> and <b>3.3.3.3</b>.',
       'Advertise every 10.0.x.x interface and each router\'s own loopback.',
+      'Keep the <b>R1\u2013R2</b> link out of OSPF by making it <b>passive at both ends</b> — that link is the reserve path, and a backup your routing protocol already uses is not a backup.',
     ] },
     { d: 'R1 — the comparison', r: [
       'Start with a static route to <b>3.3.3.3/32</b> via <b>10.0.12.2</b>, and work out which source wins once OSPF is running.',
@@ -1062,18 +1063,20 @@ L({
         'Still on <b>R1</b>, start OSPF process <b>1</b> and set the router ID to <b>1.1.1.1</b>.',
         'Advertise <b>10.0.0.0</b> with wildcard <b>0.0.255.255</b> in area <b>0</b> — one statement covers every 10.0.x.x interface.',
         'Advertise the loopback <b>1.1.1.1</b> with wildcard <b>0.0.0.0</b> in area 0.',
+        'Then make <b>G0/1</b> — the link towards R2 — <b>passive</b>.',
       ],
-      done: 'The OSPF process exists with two network statements.',
-      why: 'A wildcard of 0.0.255.255 matches a whole /16 worth of interfaces at once; 0.0.0.0 matches exactly one address. Both forms turn up constantly in real configurations.' },
+      done: 'The OSPF process exists with two network statements and one passive interface.',
+      why: 'A wildcard of 0.0.255.255 matches a whole /16 worth of interfaces at once; 0.0.0.0 matches exactly one address. The passive line is what makes the rest of this lab possible: G0/1 is the path you are holding in reserve, so OSPF must advertise that subnet without forming an adjacency across it. A backup path your routing protocol already uses is not a backup.' },
 
     { t: 'Enable OSPF on R2 and R3 so the routers can talk',
       do: [
         'On <b>R2</b>: OSPF process <b>1</b>, router ID <b>2.2.2.2</b>, advertise <b>10.0.0.0 0.0.255.255</b> and <b>2.2.2.2 0.0.0.0</b>, both in area 0.',
+        'On <b>R2</b>, also make <b>G0/0</b> — its side of the link to R1 — <b>passive</b>, matching what you did on R1.',
         'On <b>R3</b>: OSPF process <b>1</b>, router ID <b>3.3.3.3</b>, advertise <b>10.0.0.0 0.0.255.255</b> and <b>3.3.3.3 0.0.0.0</b>, both in area 0.',
         'Check the neighbour table on each.',
       ],
-      done: 'R3 shows two neighbours; R1 and R2 show their own.',
-      why: 'Adjacencies form within seconds once both ends are configured. From here on every router learns every network without anybody typing a route.' },
+      done: 'R3 shows two neighbours. R1 and R2 each show only R3 — they are deliberately not adjacent to each other.',
+      why: 'Adjacencies form within seconds once both ends are configured. One interface has to be passive at BOTH ends: leave it active on one side and that side keeps trying to form an adjacency that can never complete. Every router still learns every network, because a passive interface is advertised — it simply does not speak OSPF.' },
 
     { t: 'Work out which source of information won for 3.3.3.3',
       do: [
@@ -1105,8 +1108,8 @@ L({
         'Display the routing table and the OSPF neighbour table.',
         'Then ping <b>3.3.3.3</b>.',
       ],
-      done: 'The floating static is now installed and the ping still succeeds.',
-      why: 'A backup you have never tested is not a backup. Traffic now takes the longer path via R2 and users notice nothing beyond a brief blip.' },
+      done: 'Every O route is gone, the neighbour table is empty, the floating static is installed, and the ping still succeeds.',
+      why: 'G0/2 was R1\'s only adjacency, so OSPF loses everything at once and nothing is left at AD 110 to beat the AD-200 static. Traffic now takes the reserve path via R2 and users notice nothing beyond a brief blip. A backup you have never tested is not a backup.' },
 
     { t: 'Restore the link and confirm it fails back',
       do: [
@@ -1142,13 +1145,13 @@ L({
   ],
   steps: [
     { d: 'R1', t: 'Start with what you already know — a static route.', c: ['enable', 'terminal length 0', 'configure terminal', 'ip route 3.3.3.3 255.255.255.255 10.0.12.2', 'end', 'show ip route'], note: 'Look at the [1/0] beside the route: administrative distance 1, metric 0. Note the path — via R2, the long way round.' },
-    { d: 'R1', t: 'Now configure OSPF on R1 so the routers can learn from each other.', c: ['configure terminal', 'router ospf 1', 'router-id 1.1.1.1', 'network 10.0.0.0 0.0.255.255 area 0', 'network 1.1.1.1 0.0.0.0 area 0', 'end'], note: 'One wildcard-masked statement covers every 10.0.x.x interface. The loopback gets its own exact-match statement.' },
-    { d: 'R2', t: 'OSPF on R2.', c: ['enable', 'terminal length 0', 'configure terminal', 'router ospf 1', 'router-id 2.2.2.2', 'network 10.0.0.0 0.0.255.255 area 0', 'network 2.2.2.2 0.0.0.0 area 0', 'end', 'show ip ospf neighbor'], note: 'R1 should already appear as a neighbour in FULL state. Adjacency forms in seconds once both ends are configured.' },
-    { d: 'R3', t: 'And OSPF on R3, completing the triangle.', c: ['enable', 'terminal length 0', 'configure terminal', 'router ospf 1', 'router-id 3.3.3.3', 'network 10.0.0.0 0.0.255.255 area 0', 'network 3.3.3.3 0.0.0.0 area 0', 'end', 'show ip ospf neighbor', 'show ip route'], note: 'R3 has two neighbours, R1 and R2. Every router now knows every network without anyone typing a route.' },
+    { d: 'R1', t: 'Now configure OSPF on R1 so the routers can learn from each other.', c: ['configure terminal', 'router ospf 1', 'router-id 1.1.1.1', 'network 10.0.0.0 0.0.255.255 area 0', 'network 1.1.1.1 0.0.0.0 area 0', 'passive-interface g0/1', 'end'], note: 'One wildcard-masked statement covers every 10.0.x.x interface. The loopback gets its own exact-match statement. The last line is the important one: G0/1 towards R2 is the link you are keeping in reserve, so OSPF advertises that subnet but forms no adjacency across it.' },
+    { d: 'R2', t: 'OSPF on R2.', c: ['enable', 'terminal length 0', 'configure terminal', 'router ospf 1', 'router-id 2.2.2.2', 'network 10.0.0.0 0.0.255.255 area 0', 'network 2.2.2.2 0.0.0.0 area 0', 'passive-interface g0/0', 'end', 'show ip ospf neighbor'], note: 'The neighbour table is empty for now — G0/0 faces R1 and you have just made it passive at this end too, which is what keeps the reserve link out of OSPF. R3 appears as soon as you configure it in the next step.' },
+    { d: 'R3', t: 'And OSPF on R3, completing the triangle.', c: ['enable', 'terminal length 0', 'configure terminal', 'router ospf 1', 'router-id 3.3.3.3', 'network 10.0.0.0 0.0.255.255 area 0', 'network 3.3.3.3 0.0.0.0 area 0', 'end', 'show ip ospf neighbor', 'show ip route'], note: 'R3 is the only router with two neighbours — it is adjacent to both R1 and R2. R1 and R2 are not adjacent to each other, because that link is the reserve path. Every router still learns every network: a passive interface is advertised, it just does not form an adjacency.' },
     { d: 'R1', t: 'Which source won for 3.3.3.3?', c: ['show ip route'], note: 'The static route is still there, marked S, still pointing via R2 — even though OSPF knows the direct link to R3 exists. AD 1 beats AD 110, and the router never compares the two metrics.' },
     { d: 'R1', t: 'Remove the static route and watch OSPF take over.', c: ['configure terminal', 'no ip route 3.3.3.3 255.255.255.255 10.0.12.2', 'end', 'show ip route'], note: 'The entry is now O with [110/2] — learned by OSPF, and via the direct link, which is the better path. The OSPF route existed all along; it simply was not installed.' },
-    { d: 'R1', t: 'Build a floating static as a deliberate backup.', c: ['configure terminal', 'ip route 3.3.3.3 255.255.255.255 10.0.12.2 200', 'end', 'show ip route'], note: 'The trailing 200 is the administrative distance. Because 200 is worse than OSPF\'s 110, this route does NOT appear in the table at all — it is waiting in reserve.' },
-    { d: 'R1', t: 'Break the OSPF path and watch the backup activate.', c: ['configure terminal', 'interface g0/2', 'shutdown', 'end', 'show ip route', 'show ip ospf neighbor'], note: 'The direct link is down and the OSPF route with it. The floating static installs itself immediately, sending traffic the long way via R2 — exactly what a backup should do.' },
+    { d: 'R1', t: 'Build a floating static as a deliberate backup.', c: ['configure terminal', 'ip route 3.3.3.3 255.255.255.255 10.0.12.2 200', 'end', 'show ip route'], note: 'The trailing 200 is the administrative distance. Because 200 is worse than OSPF\'s 110, this route does NOT appear in the table at all — it is waiting in reserve. Check for yourself: 3.3.3.3/32 is still shown as O, via the direct link.' },
+    { d: 'R1', t: 'Break the OSPF path and watch the backup activate.', c: ['configure terminal', 'interface g0/2', 'shutdown', 'end', 'show ip route', 'show ip ospf neighbor'], note: 'G0/2 was R1\'s only OSPF adjacency, so every O route disappears at once — the neighbour table is now empty. With nothing left at AD 110, the AD-200 static installs itself and sends traffic the long way via R2. This is why the reserve link was kept passive: had OSPF been running across it, OSPF would simply have rerouted and the static would never have been needed.' },
     { d: 'R1', t: 'Prove the backup path actually carries traffic.', c: ['ping 3.3.3.3'], note: 'Still reachable, just by a longer route. Users notice nothing beyond a brief blip.' },
     { d: 'R1', t: 'Restore the link and confirm it fails back.', c: ['configure terminal', 'interface g0/2', 'no shutdown', 'end', 'show ip route'], note: 'OSPF re-forms the adjacency and its AD-110 route displaces the AD-200 static, which drops quietly back into reserve. Automatic in both directions.' },
     { d: 'R1', t: 'Read the summary of what is running.', c: ['show ip protocols'], note: 'Protocol, router ID, what it advertises, which interfaces are passive, and the administrative distance it uses. The first command to run when you inherit an unfamiliar router.' },
@@ -1170,6 +1173,11 @@ L({
 <tr><td>EIGRP (external)</td><td><b>170</b></td><td>iBGP</td><td><b>200</b></td></tr>
 <tr><td colspan="4">255 = never installed (considered unreachable)</td></tr>
 </table>
+<h3>Why the reserve link is kept out of OSPF</h3>
+<p>This is the detail that makes a floating static work, and the one most write-ups skip. The three routers form a triangle, so if OSPF ran on all three links, shutting R1's direct link to R3 would change nothing interesting: OSPF would simply recalculate and reach 3.3.3.3 the long way round via R2, still at AD 110, and the AD-200 static would stay in reserve forever. You would have built a backup that can never be used.</p>
+<p>Making the R1–R2 link passive at both ends is what creates a genuine failure to recover from. OSPF still <em>advertises</em> that subnet — passive means "do not form an adjacency here", not "pretend this network does not exist" — but no OSPF traffic crosses it, so R1's only adjacency is the direct link to R3. Lose that and R1 has no dynamic route to anything, which is exactly when a floating static should take over. This mirrors the real case the technique exists for: a cheap backup WAN or LTE link that you deliberately keep out of the IGP so it sits idle until the primary fails.</p>
+<h3>A static route needs a reachable next hop</h3>
+<p>A static route pointing at a next-hop <em>address</em> is only installed while the router can resolve that address through some other route. Shut the interface the next hop lives on and the connected route disappears, the next hop becomes unresolvable, and the static quietly leaves the table — even though it is still in the running configuration. This catches people out constantly: <code>show running-config</code> shows the route, <code>show ip route</code> does not, and nothing is broken. The fix is always to look at what the next hop needs in order to be reachable.</p>
 <h3>Floating static routes</h3>
 <p><code>ip route 3.3.3.3 255.255.255.255 10.0.12.2 <b>200</b></code> — the trailing number overrides the default AD of 1. Set it above the dynamic protocol's AD and the static route waits, invisible, until the dynamic route disappears. It is the standard way to configure a backup WAN link, and it needs no extra logic at all.</p>
 <h3>Metrics, and the order of decisions</h3>
@@ -1178,10 +1186,11 @@ L({
 <p>That first rule catches people out: a /32 static and a /24 OSPF route are not competing at all, because they match different amounts of the address.</p>`,
   checks: [
     { desc: 'OSPF is running on all three routers with unique IDs', fn: H => ['1.1.1.1', '2.2.2.2', '3.3.3.3'].every((id, n) => { const d = H.d(['R1', 'R2', 'R3'][n]); return d.ospf && d.ospf.routerId === id; }) },
-    { desc: 'R1 has OSPF adjacencies with both neighbours', fn: H => H.ospfNbr('R1', 'R2') && H.ospfNbr('R1', 'R3') },
-    { desc: 'The original AD-1 static route to 3.3.3.3/32 was removed', fn: H => !H.d('R1').staticRoutes.some(r => r.net === '3.3.3.3' && r.ad === 1) },
+    { desc: 'R1 is adjacent to R3, and the reserve link to R2 is passive at both ends', fn: H => H.ospfNbr('R1', 'R3') && !H.ospfNbr('R1', 'R2') && H.d('R1').ospf.passive.includes('GigabitEthernet0/1') && H.d('R2').ospf.passive.includes('GigabitEthernet0/0') },
+    { desc: 'R3 is adjacent to both R1 and R2', fn: H => H.ospfNbr('R3', 'R1') && H.ospfNbr('R3', 'R2') },
+    { desc: 'The original AD-1 static route to 3.3.3.3/32 was removed', fn: H => !!H.d('R1').ospf && !H.d('R1').staticRoutes.some(r => r.net === '3.3.3.3' && (r.ad || 1) === 1) },
     { desc: 'A floating static to 3.3.3.3/32 exists with AD 200', fn: H => H.d('R1').staticRoutes.some(r => r.net === '3.3.3.3' && r.ad === 200) },
-    { desc: 'The link R1 shut for the failover test is back up', fn: H => H.noshut('R1', 'g0/2') && H.up('R1', 'g0/2') },
+    { desc: 'The link R1 shut for the failover test is back up', fn: H => H.d('R1').staticRoutes.some(r => r.net === '3.3.3.3' && r.ad === 200) && H.noshut('R1', 'g0/2') && H.up('R1', 'g0/2') },
     { desc: 'A less specific /24 route was added to demonstrate longest-prefix match', fn: H => H.d('R1').staticRoutes.some(r => r.net === '3.3.3.0' && r.mask === '255.255.255.0') },
     { desc: 'R1 reaches both remote loopbacks', fn: H => H.ping('R1', '2.2.2.2') && H.ping('R1', '3.3.3.3') },
     { desc: 'The LAN host reaches the far loopback', fn: H => H.ping('PC1', '3.3.3.3') },

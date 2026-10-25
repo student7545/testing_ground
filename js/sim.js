@@ -335,16 +335,51 @@ ND.routeTable = function (topo, dev) {
     if (dev.type === 'switch' && !dev.ipRouting && !/^Vlan/.test(ifc.name)) continue;
     rt.push({ proto: 'C', net: ND.netOf(ifc.ip.addr, ifc.ip.mask), mask: ifc.ip.mask, ifc, nextHop: null, ad: 0, local: ifc.ip.addr });
   }
-  for (const r of dev.staticRoutes) {
-    rt.push({ proto: 'S', net: r.net, mask: r.mask, nextHop: r.via, ifc: r.viaIfc ? dev.ifaces[r.viaIfc] : null, ad: r.ad || 1 });
-  }
+  const ospf = [];
   if (dev.ospf && (dev.type === 'router' || dev.ipRouting)) {
     for (const r of ND.ospfDomainRoutes(topo, dev)) {
-      const dup = rt.some(x => x.net === r.net && x.mask === r.mask);
-      if (!dup) rt.push({ proto: r.external ? 'O*E2' : 'O', net: r.net, mask: r.mask, nextHop: r.nextHop, ifc: r.viaIfc, ad: 110 });
+      ospf.push({ proto: r.external ? 'O*E2' : 'O', net: r.net, mask: r.mask, nextHop: r.nextHop, ifc: r.viaIfc, ad: 110 });
     }
   }
-  return rt;
+
+  /* A static route pointing at a next-hop ADDRESS is only installed while that
+     address can be resolved through some other route -- lose the interface the
+     next hop sits on and the static drops out of the table with it. Resolution
+     repeats so one static may recurse through another, and never goes through
+     the default route. A static given an exit INTERFACE instead just needs that
+     interface to be up. */
+  const statics = [];
+  const pending = dev.staticRoutes.map(r => ({
+    proto: 'S', net: r.net, mask: r.mask, nextHop: r.via,
+    ifc: r.viaIfc ? dev.ifaces[r.viaIfc] : null, ad: r.ad || 1, viaIfcName: r.viaIfc,
+  }));
+  const resolves = ip => rt.concat(ospf, statics).some(r =>
+    ND.mask2len(r.mask) > 0 && ND.sameSubnet(ip, r.net, r.mask));
+  for (let pass = 0; pass <= pending.length; pass++) {
+    let added = false;
+    for (const sr of pending) {
+      if (sr.installed) continue;
+      const ok = sr.viaIfcName
+        ? !!(dev.ifaces[sr.viaIfcName] && ND.ifaceUp(topo, dev, dev.ifaces[sr.viaIfcName]))
+        : !!(sr.nextHop && resolves(sr.nextHop));
+      if (ok) { sr.installed = true; statics.push(sr); added = true; }
+    }
+    if (!added) break;
+  }
+
+  /* Administrative distance decides WHICH SOURCE to believe about a given
+     prefix, so only the lowest-AD entry for each prefix is installed. That is
+     the whole mechanism behind a floating static: give it a worse AD than the
+     routing protocol and it stays out of the table until the protocol's route
+     disappears. Different prefix lengths are different prefixes and all stay --
+     that contest is longest-prefix match, settled later in routeLookup. */
+  const best = new Map();
+  for (const r of rt.concat(statics, ospf)) {
+    const key = r.net + '/' + r.mask;
+    const cur = best.get(key);
+    if (!cur || r.ad < cur.ad) best.set(key, r);
+  }
+  return [...best.values()];
 };
 
 ND.routeLookup = function (topo, dev, dstIp) {
