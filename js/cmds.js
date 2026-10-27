@@ -204,6 +204,90 @@ function exitToConf(dev) {
 }
 
 /* ---------- help (?) ---------- */
+/* A keyword that heads a whole family of commands needs its own description.
+   Without one, "?" borrowed the description of whichever child happened to be
+   registered first, so "ip" read "Enable DNS-based host translation" and "no"
+   read "Remove the enable secret". Keys are the canonical command path, so the
+   same word can be described differently at different depths, and the text is
+   kept true of every command underneath it. */
+const KEYWORD_DESC = {
+  /* global configuration */
+  'no': 'Negate a command or set its defaults',
+  'ip': 'IP configuration subcommands',
+  'ipv6': 'IPv6 configuration subcommands',
+  'router': 'Enable a routing process',
+  'snmp-server': 'Modify SNMP engine parameters',
+  'service': 'Modify use of network based services',
+  'security': 'Infrastructure security commands',
+  'mls': 'MLS configuration subcommands',
+  'spanning-tree': 'Spanning Tree Subsystem',
+  'username': 'Establish User Name Authentication',
+  'vtp': 'Configure global VTP state',
+  'ntp': 'Configure NTP',
+  'crypto': 'Encryption module',
+  'interface': 'Select an interface to configure',
+  'line': 'Configure a terminal line',
+  'logging': 'Modify message logging facilities',
+  'banner': 'Define a login banner',
+  'enable': 'Modify enable password parameters',
+  'aaa': 'Authentication, Authorization and Accounting',
+  'cdp': 'CDP configuration subcommands',
+  'lldp': 'LLDP configuration subcommands',
+  'vlan': 'VLAN commands',
+  'access-list': 'Add an access list entry',
+  /* ip ... */
+  'ip access-list': 'Named access-list',
+  'ip arp': 'Address Resolution Protocol',
+  'ip dhcp': 'Configure DHCP server and relay parameters',
+  'ip domain': 'IP DNS Resolver',
+  'ip ftp': 'FTP configuration commands',
+  'ip http': 'HTTP server configuration',
+  'ip nat': 'NAT configuration commands',
+  'ip route': 'Establish static routes',
+  'ip ssh': 'Configure ssh options',
+  /* snmp-server ... */
+  'snmp-server community': 'Enable SNMP; set community string and access privs',
+  'snmp-server host': 'Specify hosts to receive SNMP notifications',
+  'snmp-server enable': 'Enable SNMP Traps',
+  /* interface configuration */
+  'switchport': 'Set switching mode characteristics',
+  'switchport mode': 'Set trunking mode of the interface',
+  'switchport trunk': 'Set trunking characteristics of the interface',
+  'switchport port-security': 'Security related command',
+  'ip ospf': 'OSPF interface commands',
+  'ip access-group': 'Specify access control for packets',
+  'mls qos': 'QoS configuration commands',
+  'power inline': 'Power inline configuration',
+  'standby': 'HSRP interface configuration commands',
+  'encapsulation': 'Set encapsulation type for an interface',
+  'power': 'Power configuration',
+  /* privileged exec */
+  'show': 'Show running system information',
+  'clear': 'Reset functions',
+  'copy': 'Copy from one file to another',
+  'write': 'Write running configuration to memory, network, or terminal',
+  'terminal': 'Set terminal line parameters',
+  /* show ... */
+  'show ip': 'IP information',
+  'show ipv6': 'IPv6 information',
+  'show cdp': 'CDP information',
+  'show lldp': 'LLDP information',
+  'show mac': 'MAC configuration',
+  'show interfaces': 'Interface status and configuration',
+  'show snmp': 'SNMP information',
+  'show mls': 'MLS information',
+  'show ntp': 'Network time protocol',
+  'show vtp': 'VTP information',
+  'show standby': 'Hot standby protocol information',
+  'show etherchannel': 'EtherChannel information',
+  'show port-security': 'Show secure port information',
+  'show power': 'Power Over Ethernet',
+  'show ip dhcp': 'Show items in the DHCP database',
+  'show ip nat': 'NAT information',
+  'show ip ospf': 'OSPF information',
+  'show ip interface': 'IP interface status and configuration',
+};
+
 ND.helpFor = function (topo, dev, lineBeforeQ) {
   const specs = specsFor(dev);
   const endsWithSpace = /\s$/.test(lineBeforeQ) || lineBeforeQ === '';
@@ -250,7 +334,12 @@ ND.helpFor = function (topo, dev, lineBeforeQ) {
       if (isPlaceholder(next)) { /* show placeholder */ }
       else if (!label.startsWith(partial)) continue;
     }
-    if (!opts.has(label)) opts.set(label, spec.desc || '');
+    /* Prefer the keyword's own description over a child command's. */
+    const generic = next !== '<cr>' && !isPlaceholder(next)
+      ? KEYWORD_DESC[spec.pat.slice(0, pi + 1).map(x => x.toLowerCase()).join(' ')]
+      : null;
+    if (generic) opts.set(label, generic);
+    else if (!opts.has(label)) opts.set(label, spec.desc || '');
   }
   if (!opts.size) return ['% Unrecognized command'];
   const width = Math.max(...[...opts.keys()].map(k => k.length)) + 2;
