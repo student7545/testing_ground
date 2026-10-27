@@ -161,6 +161,9 @@ ND.devIps = function (topo, dev) {
 ND.pcNet = function (topo, dev) {
   const c = dev.pcCfg;
   if (!c.dhcp) return c;
+  /* The lease was handed back, so the adapter holds no address until it asks
+     for another one. Without this, release and renew have nothing to act on. */
+  if (c.released) return { ip: null, mask: null, gw: null };
   if (dev._pcNetBusy) return { ip: null, mask: null, gw: null };
   dev._pcNetBusy = true;
   try { return pcNetDhcp(topo, dev); } finally { dev._pcNetBusy = false; }

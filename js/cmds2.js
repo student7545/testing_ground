@@ -510,10 +510,39 @@ cmd(['if'], 'no ipv6 address', 'Remove IPv6 addresses', c => eachIf(c, i => { i.
 cmd(['pc'], 'ipconfig /all', 'Full IP configuration', c => pcIpconfig(c, true));
 cmd(['pc'], 'ipconfig /renew', 'Renew DHCP lease', c => {
   if (!c.dev.pcCfg.dhcp) return c.out('This adapter uses a static address.');
+  c.dev.pcCfg.released = false;
   const net = ND.pcNet(c.topo, c.dev);
   if (net.ip) c.out(`DHCP lease obtained.\n`);
   else c.out('An error occurred while renewing interface Ethernet0 : unable to contact your DHCP server.', 'err');
   pcIpconfig(c, false);
+});
+cmd(['pc'], 'ipconfig /release', 'Release the DHCP lease', c => {
+  if (!c.dev.pcCfg.dhcp) return c.out('The operation failed as no adapter is in the state permissible for this operation.', 'err');
+  c.dev.pcCfg.released = true;
+  c.out('Windows IP Configuration\n');
+  pcIpconfig(c, false);
+});
+cmd(['pc'], 'ipconfig /flushdns', 'Clear the DNS resolver cache', c => {
+  c.out('Windows IP Configuration\n\n    Successfully flushed the DNS Resolver Cache.');
+});
+cmd(['pc'], 'ipconfig /displaydns', 'Show the DNS resolver cache', c => {
+  c.out('Windows IP Configuration\n\n    The DNS Resolver Cache is empty.');
+});
+cmd(['pc'], 'ipconfig /registerdns', 'Re-register the adapter in DNS', c => {
+  c.out('Windows IP Configuration\n\n    Registration of the DNS resource records for all adapters of this computer has been initiated. Any errors will be reported in the Event Viewer in 15 minutes.');
+});
+cmd(['pc'], 'ipconfig /?', 'Show ipconfig usage', c => {
+  c.out([
+    'USAGE:', '    ipconfig [/all] [/renew] [/release] [/flushdns] [/displaydns] [/registerdns]', '',
+    'Options:', '    /?             Display this help message',
+    '    /all           Display full configuration information',
+    '    /release       Release the IPv4 address for the adapter',
+    '    /renew         Renew the IPv4 address for the adapter',
+    '    /flushdns      Purge the DNS Resolver cache',
+    '    /registerdns   Refresh all DHCP leases and re-register DNS names',
+    '    /displaydns    Display the contents of the DNS Resolver Cache', '',
+    'The default is to display only the IP address, subnet mask and default gateway for each adapter.',
+  ].join('\n'));
 });
 cmd(['pc'], 'ipconfig', 'Show IP configuration', c => pcIpconfig(c, false));
 function pcIpconfig(c, all) {

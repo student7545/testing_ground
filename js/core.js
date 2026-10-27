@@ -131,7 +131,7 @@ ND.makeDevice = function (opts) {
       : [{ name: 'c2900-universalk9-mz.SPA.157-3.M4.bin', size: 33591768 }, { name: 'cpconfig-29xx.cfg', size: 3000 }],
     startup: null, saved: false,
     // PC-only network config
-    pcCfg: opts.type === 'pc' ? { ip: null, mask: null, gw: null, dhcp: !!opts.dhcp, dns: null } : null,
+    pcCfg: opts.type === 'pc' ? { ip: null, mask: null, gw: null, dhcp: !!opts.dhcp, dns: null, released: false } : null,
     // console session state (per device)
     sess: { mode: 'exec', iface: null, ifaceRange: null, rangeMode: false, line: null, vlan: null, pool: null, acl: null, history: [], hIdx: -1, pendingAuth: null, moreBuf: null },
   };
