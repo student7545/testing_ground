@@ -332,7 +332,11 @@ function doPing(c, ip) {
   if (!ND.isIp(ip)) {
     const r = ND.resolveName(c.topo, c.dev, ip);
     if (!r) { c.out('Translating "' + ip + '"...domain server (255.255.255.255)\n% Unrecognized host or address.', 'err'); return; }
-    c.out(`Translating "${ip}"...domain server (${r.via})\n[OK]`);
+    /* The static host table is local, so a hit there consults no server and
+       IOS prints nothing -- only a real DNS query announces itself. Saying
+       "domain server (static)" made it look as though lookups were still
+       running after no ip domain-lookup. */
+    if (r.via !== 'static') c.out(`Translating "${ip}"...domain server (${r.via})\n[OK]`);
     ip = r.ip;
   }
   const res = ND.tracePacket(c.topo, c.dev, ip, { proto: 'icmp', learn: true });
