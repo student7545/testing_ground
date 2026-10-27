@@ -227,6 +227,10 @@ ND.deviceOwning = function (topo, ip) {
 ND.hsrpActive = function (topo, dev, ifc, group) {
   const mine = ifc.standby[group];
   if (!mine || !mine.ip) return false;
+  /* A router cannot hold the active role over an interface that is down: with
+     no way to send hellos or receive traffic for the virtual address, the group
+     drops to Init and the peer takes over. */
+  if (!ND.ifaceUp(topo, dev, ifc)) return false;
   // find peer on same segment with same group
   const eps = ND.l2Endpoints(topo, dev, ifc);
   for (const ep of eps) {
@@ -241,6 +245,15 @@ ND.hsrpActive = function (topo, dev, ifc, group) {
     }
   }
   return true;
+};
+
+/* HSRP state for the group as a router would report it. Init covers the case
+   where the interface is down or the group has no virtual address yet, so the
+   router is not participating at all -- which is why it shows no peers. */
+ND.hsrpState = function (topo, dev, ifc, group) {
+  const st = ifc.standby[group];
+  if (!st || !st.ip || !ND.ifaceUp(topo, dev, ifc)) return 'Init';
+  return ND.hsrpActive(topo, dev, ifc, group) ? 'Active' : 'Standby';
 };
 
 /* ============ OSPF ============ */

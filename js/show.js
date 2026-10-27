@@ -322,13 +322,18 @@ ND.showStandbyBrief = function (topo, dev) {
   for (const ifc of Object.values(dev.ifaces)) {
     for (const [g, st] of Object.entries(ifc.standby)) {
       if (!st.ip) continue;
-      const active = ND.hsrpActive(topo, dev, ifc, +g);
+      const state = ND.hsrpState(topo, dev, ifc, +g);
       let peerIp = 'unknown';
       for (const ep of ND.l2Endpoints(topo, dev, ifc)) {
         if (ep.ifc.standby && ep.ifc.standby[g] && ep.ifc.ip) peerIp = ep.ifc.ip.addr;
       }
-      rows.push(pad(ND.shortIface(ifc.name), 10) + pad(g, 5) + pad(st.priority ?? 100, 5) + pad(st.preempt ? 'P' : ' ', 2) + pad(active ? 'Active' : 'Standby', 9)
-        + pad(active ? 'local' : peerIp, 17) + pad(active ? peerIp : 'local', 17) + st.ip);
+      /* In Init this router is not taking part, so it knows of neither role.
+         Otherwise one column is "local" and the other is the peer, or
+         "unknown" when there is no peer to fill it. */
+      const activeCol = state === 'Init' ? 'unknown' : state === 'Active' ? 'local' : peerIp;
+      const standbyCol = state === 'Init' ? 'unknown' : state === 'Active' ? peerIp : 'local';
+      rows.push(pad(ND.shortIface(ifc.name), 10) + pad(g, 5) + pad(st.priority ?? 100, 5) + pad(st.preempt ? 'P' : ' ', 2) + pad(state, 9)
+        + pad(activeCol, 17) + pad(standbyCol, 17) + st.ip);
     }
   }
   if (!rows.length) return '';
