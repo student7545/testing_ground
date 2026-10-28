@@ -178,6 +178,10 @@ ND.execLine = function (topo, dev, rawLine, out) {
       r2.spec.run({ topo, dev, out, s }, r2.caps);
       return;
     }
+    /* The global tree recognises this but has more to say about it, as with
+       "spanning-tree portfast bpduguard" still wanting "default". Report that
+       rather than calling the last word invalid when it was the right word. */
+    if (r2.err !== 'invalid') r = r2;
   }
   if (r.err) {
     const tried = ['exec', 'priv', 'conf'].includes(s.mode) || dev.type === 'pc' ? specs : specs.concat(REG.conf);
@@ -314,8 +318,12 @@ ND.helpFor = function (topo, dev, lineBeforeQ) {
   const endsWithSpace = /\s$/.test(lineBeforeQ) || lineBeforeQ === '';
   const toks = lineBeforeQ.trim() === '' ? [] : lineBeforeQ.trim().split(/\s+/);
   const opts = new Map();
-  const consider = dev.sess.mode !== 'exec' && dev.sess.mode !== 'priv' && dev.type !== 'pc'
-    ? specs.concat(REG.conf.filter(() => dev.sess.mode !== 'conf')) : specs;
+  /* "?" lists the commands of the mode you are in, as a real device does.
+     Global commands stay typeable from a submode -- execLine falls back to
+     them, matching IOS -- but listing them here buried the interface commands
+     under thirty globals and, worse, advertised "spanning-tree portfast
+     bpduguard" as if it were an interface command when it is a global one. */
+  const consider = specs;
 
   const prefix = endsWithSpace ? toks : toks.slice(0, -1);
   // exact keyword matches beat prefix matches at each position (IOS behavior)

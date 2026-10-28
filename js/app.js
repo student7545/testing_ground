@@ -374,10 +374,42 @@ function renderLab(lab, keepState) {
   }
 }
 
-function taskHtml(t, mode, hideDetail) {
+/* Which device a task is carried out on. A task may say so itself with a `d`
+   field; otherwise it is read from the wording, and failing that inherited from
+   the task before it, because a lab works through one device at a time. Only an
+   instruction to go somewhere counts as naming a device -- "the interface facing
+   PC1" is about R1, so a bare mention is not enough. */
+function taskDevices(lab) {
+  const ids = lab.devices.map(d => d.id).sort((a, b) => b.length - a.length);
+  const strip = x => String(x).replace(/<[^>]+>/g, '');
+  const addressed = txt => {
+    const t = strip(txt);
+    for (const id of ids) {
+      if (new RegExp('(?:^|[^A-Za-z0-9])(?:On|on|From|from|At|at)\\s+(?:the\\s+)?' + id + '(?:[^A-Za-z0-9]|$)').test(t)) return id;
+      if (new RegExp('^' + id + '(?:[^A-Za-z0-9]|$)').test(t.trim())) return id;
+      if (new RegExp('(?:^|[^A-Za-z0-9])' + id + '\\s+tab(?:[^A-Za-z0-9]|$)').test(t)) return id;
+      if (new RegExp('(?:Switch|Move|Go|Back)\\s+to\\s+(?:the\\s+)?' + id + '(?:[^A-Za-z0-9]|$)').test(t)) return id;
+    }
+    return null;
+  };
+  const infra = lab.devices.filter(d => d.type !== 'pc');
+  const seed = infra.length === 1 ? infra[0].id : null;
+  let cur = null;
+  return lab.tasks.map(t => {
+    if (typeof t === 'string') return null;
+    if (t.d) { cur = t.d; return t.d; }
+    let d = addressed(t.t);
+    if (!d) for (const b of (t.do || [])) { d = addressed(b); if (d) break; }
+    if (!d) d = cur || seed;
+    cur = d;
+    return d;
+  });
+}
+
+function taskHtml(t, mode, hideDetail, dev) {
   if (typeof t === 'string') return `<li><div class="taskline"><span class="tasktext">${t}</span></div></li>`;
   const dos = mode === 'drill' ? null : (Array.isArray(t.do) ? t.do : null);
-  let h = `<li><div class="taskline"><span class="tasktext">${t.t}</span>`;
+  let h = `<li><div class="taskline">${dev ? `<span class="stepdev">${dev}</span>` : ''}<span class="tasktext">${t.t}</span>`;
   if (t.why) h += `<button class="whybtn" aria-expanded="false">why?</button>`;
   h += `</div>`;
   if (dos) {
@@ -433,7 +465,8 @@ function instructionsHtml(lab, mode) {
     h += `<div class="ctlrow"><h3>Your tasks</h3><button class="btn small" id="dettoggle">${hideDetail ? 'Details: hidden' : 'Details: shown'}</button></div>`;
     if (hideDetail) h += `<p class="dim">Each task shows what to achieve \u2014 open <b>Show steps</b> only if you need telling how.</p>`;
   }
-  h += `<ol class="tasks">${lab.tasks.map(t => taskHtml(t, mode, hideDetail)).join('')}</ol>`;
+  const tdevs = taskDevices(lab);
+  h += `<ol class="tasks">${lab.tasks.map((t, i) => taskHtml(t, mode, hideDetail, tdevs[i])).join('')}</ol>`;
   if (mode === 'drill') {
     h += `<div class="callout"><b>Drill mode.</b> Each task is boiled down to its headline and the step-by-step commands are hidden \u2014 work from the task list and the live checks alone. Switch to <b>Guided</b> in the top bar if you get stuck, or to <b>Practice</b> for the requirements-only version.</div>`;
   } else {

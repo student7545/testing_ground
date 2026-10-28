@@ -143,7 +143,7 @@ L({
       done: 'Two pools with the full option set, and the bottom 20 addresses of each subnet reserved.',
       why: 'The exclusions go in first, on purpose. A pool that is already live can hand out the very address you were about to give a printer, and you will not find out until the printer stops working.' },
 
-    { t: 'PHASE 4 — Build the core switch: VLANs and the routed uplink',
+    { d: 'CORE', t: 'PHASE 4 — Build the core switch: VLANs and the routed uplink',
       do: [
         'Name the switch <b>CORE</b> and enable <code>ip routing</code>.',
         'Create VLANs <b>10 OFFICE</b>, <b>20 WAREHOUSE</b>, <b>30 VOICE</b> and <b>99 MGMT</b>, naming each one.',
@@ -153,7 +153,7 @@ L({
       done: 'Four named VLANs exist and G0/1 is a routed port with an address.',
       why: '<code>no switchport</code> is the line that turns a switch port into a router port. Without <code>ip routing</code> the switch would happily hold the addresses and refuse to forward a single packet between them.' },
 
-    { t: 'Create a gateway for every VLAN',
+    { d: 'CORE', t: 'Create a gateway for every VLAN',
       do: [
         'Create <b>interface vlan 10</b> with <b>10.20.10.1 255.255.255.0</b> and bring it up.',
         'Do the same for <b>vlan 20</b> (10.20.20.1), <b>vlan 30</b> (10.20.30.1) and <b>vlan 99</b> (10.20.99.1).',
@@ -162,7 +162,7 @@ L({
       done: 'Four SVIs exist, each holding the .1 address of its subnet.',
       why: 'This is the whole point of a layer 3 switch: traffic between the office and the warehouse is routed here, at wire speed, instead of being hauled up to a router and back down the same cable.' },
 
-    { t: 'Relay DHCP from the SVIs to R1',
+    { d: 'CORE', t: 'Relay DHCP from the SVIs to R1',
       do: [
         'On <b>interface vlan 10</b> and <b>interface vlan 20</b>, add <code>ip helper-address 10.20.0.1</code>.',
         'Verify with <code>show ip interface vlan 10</code>.',
@@ -170,7 +170,7 @@ L({
       done: 'Both user SVIs show a helper address.',
       why: 'The clients broadcast; CORE is a router and does not forward broadcasts. The helper turns each DISCOVER into a unicast to R1 and stamps it with the SVI address, which is how R1 knows whether to answer from the OFFICE pool or the WAREHOUSE one.' },
 
-    { t: 'PHASE 5 — Make CORE the spanning-tree root and build the office bundle',
+    { d: 'CORE', t: 'PHASE 5 — Make CORE the spanning-tree root and build the office bundle',
       do: [
         'Set <code>spanning-tree mode rapid-pvst</code> and make CORE the root for VLANs <b>1,10,20,30,99</b>.',
         'On <b>G0/2</b> and <b>G0/3</b> together: dot1q encapsulation, trunk mode, and <code>channel-group 1 mode active</code>.',
@@ -180,7 +180,7 @@ L({
       done: 'A Port-channel 1 trunk exists and G0/4 is a restricted trunk.',
       why: 'Root placement is a decision, not an accident — left alone, STP elects whichever switch has the oldest MAC address. The allowed-VLAN lists are the cheapest security control you will configure all evening: the warehouse link physically cannot carry office or voice traffic.' },
 
-    { t: 'PHASE 6 — Build the office access switch',
+    { d: 'OFF1', t: 'PHASE 6 — Build the office access switch',
       do: [
         'Name it <b>OFF1</b>, set Rapid PVST+, and create VLANs <b>10</b>, <b>20</b>, <b>30</b> and <b>99</b> with names.',
         'Put <b>G0/1</b> and <b>G0/2</b> into <code>channel-group 1 mode active</code> as dot1q trunks, then configure <b>interface port-channel 1</b> as a trunk allowing <b>10,20,30,99</b>.',
@@ -189,7 +189,7 @@ L({
       done: 'Po1 shows both members bundled and the trunk is carrying the four VLANs.',
       why: 'Both ends must agree or the members are suspended rather than bundled. Reading <code>show etherchannel summary</code> and understanding the (P) flag is the skill being built here.' },
 
-    { t: 'Configure the office host ports',
+    { d: 'OFF1', t: 'Configure the office host ports',
       do: [
         'Put <b>F0/1</b> and <b>F0/3</b> in access VLAN <b>10</b>, with PortFast and BPDU guard on both.',
         'Put <b>F0/2</b> in access VLAN <b>30</b> for the phone, with PortFast, BPDU guard, <code>power inline auto</code> and <code>mls qos trust device cisco-phone</code>.',
@@ -198,7 +198,7 @@ L({
       done: 'Three host ports configured, each in the right VLAN with edge-port protection.',
       why: 'PortFast gets a host forwarding immediately instead of making it wait out a spanning-tree transition; BPDU guard is what makes that safe, by shutting the port if something that speaks STP is ever plugged into it.' },
 
-    { t: 'Lock down the first desk port and protect DHCP',
+    { d: 'OFF1', t: 'Lock down the first desk port and protect DHCP',
       do: [
         'On <b>F0/1</b>: <code>switchport port-security</code>, maximum <b>1</b>, <code>mac-address sticky</code>, violation <b>shutdown</b>.',
         'Enable DHCP snooping globally, scope it to VLANs <b>10,20</b>, and trust <b>interface port-channel 1</b>.',
@@ -207,7 +207,7 @@ L({
       done: 'F0/1 is locked to one MAC address and only the uplink is trusted for DHCP.',
       why: 'These two features answer the two most common access-layer incidents: somebody hanging an unmanaged switch off a desk port, and somebody plugging in a home router that starts handing out addresses.' },
 
-    { t: 'PHASE 7 — Build the warehouse switch',
+    { d: 'WH1', t: 'PHASE 7 — Build the warehouse switch',
       do: [
         'Name it <b>WH1</b>, set Rapid PVST+, create VLANs <b>20</b> and <b>99</b>.',
         'Make <b>G0/1</b> a dot1q trunk allowing <b>20,99</b>.',
@@ -840,7 +840,7 @@ L({
       done: 'Three named extended ACLs, each one specific permit followed by denies followed by a catch-all.',
       why: 'This shape — permit what is required, deny the enclaves, permit the rest — is how you express "deny by default between enclaves" without cutting a subnet off from the outside world or from DHCP.' },
 
-    { t: 'Apply the policy inbound and test all three directions',
+    { d: 'R1', t: 'Apply the policy inbound and test all three directions',
       do: [
         'Apply <b>OPS-IN</b> inbound on <b>G0/1.10</b>, <b>SECURE-IN</b> on <b>G0/1.20</b>, <b>SENSOR-IN</b> on <b>G0/1.40</b>.',
         'From <b>OPS1</b>: renew the address, then ping the collector (must fail) and check that HTTPS to it would be allowed.',
@@ -849,7 +849,7 @@ L({
       done: 'Every enclave behaves exactly as the policy says, including the things that must not work.',
       why: 'Inbound on the subinterface means the packet is filtered the moment it enters the router from that enclave, before any routing decision. That is the cheapest possible place to drop traffic that was never allowed.' },
 
-    { t: 'PHASE 5 — Harden R1 itself',
+    { d: 'R1', t: 'PHASE 5 — Harden R1 itself',
       do: [
         'Create <b>netadmin</b> at privilege <b>15</b> and <b>auditor</b> at privilege <b>1</b>, both with strong secrets, then <code>enable secret</code>.',
         'Turn on <code>aaa new-model</code> and <code>aaa authentication login default local</code>.',
@@ -859,7 +859,7 @@ L({
       done: 'Two named accounts at different privilege levels and a device that throttles guesses.',
       why: 'Two privilege levels is the whole idea of authorisation in miniature: the auditor can look and cannot change. Everything else here makes an attacker\'s life slower — which, with a good password, is enough.' },
 
-    { t: 'SSH, and restrict who may even try',
+    { d: 'R1', t: 'SSH, and restrict who may even try',
       do: [
         'Set <code>ip domain-name site.mil.lab</code>, generate <b>2048-bit</b> RSA keys and force <code>ip ssh version 2</code>.',
         'Build a standard ACL <b>MGMT-ONLY</b> permitting <b>10.70.30.0 0.0.0.255</b>.',
@@ -868,7 +868,7 @@ L({
       done: 'The router accepts SSH, refuses Telnet, and only listens to the management enclave.',
       why: 'Two independent controls: SSH protects the session, <code>access-class</code> decides who is allowed to open one at all. Together they mean a compromised OPS workstation cannot even reach the login prompt.' },
 
-    { t: 'PHASE 6 — Apply the same standard to both switches',
+    { d: 'SW1', t: 'PHASE 6 — Apply the same standard to both switches',
       do: [
         'Give <b>SW1</b> 10.70.30.11/24 and <b>SW2</b> 10.70.30.12/24 on VLAN 30, each with a default gateway of 10.70.30.1.',
         'Repeat the whole hardening block on both: users, AAA, password policy, login throttling, HTTP off, SSHv2 with 2048-bit keys, <b>MGMT-ONLY</b> on the VTY lines, exec timeout, banner.',
@@ -1083,7 +1083,7 @@ L({
     ] },
   ],
   tasks: [
-    { t: 'PHASE 1 — Build the switch first, so the router has VLANs to talk to',
+    { d: 'SW1', t: 'PHASE 1 — Build the switch first, so the router has VLANs to talk to',
       do: [
         'Create VLANs <b>10 STAFF</b>, <b>20 POS</b>, <b>30 GUEST</b> and <b>99 MGMT</b>.',
         'Make <b>G0/1</b> a hard-coded dot1q trunk carrying <b>10,20,30,99</b>, with DTP switched off.',
@@ -1092,7 +1092,7 @@ L({
       done: '<code>show vlan brief</code> shows every port where you intended it and the trunk carries all four VLANs.',
       why: 'Four VLANs on one switch and one router is the shape of almost every small business network. The whole design rests on which port is in which VLAN, so get that right before anything else.' },
 
-    { t: 'Power the access point and protect the two ports that matter',
+    { d: 'SW1', t: 'Power the access point and protect the two ports that matter',
       do: [
         'On <b>F0/3</b>: <code>power inline auto</code>.',
         'On <b>F0/1</b> (the till) and <b>F0/4</b> (the recorder): port security, maximum <b>1</b>, sticky, violation <b>shutdown</b>.',
@@ -1118,7 +1118,7 @@ L({
       done: 'The switch has an address and accepts SSH only.',
       why: 'A small site is exactly where management gets skipped, and exactly where it matters: there is nobody on site who can plug in a console cable when something goes wrong at 6am.' },
 
-    { t: 'PHASE 3 — Router-on-a-stick for all four VLANs',
+    { d: 'R1', t: 'PHASE 3 — Router-on-a-stick for all four VLANs',
       do: [
         'Bring up <b>G0/1</b> (no address), then create <b>G0/1.10</b>, <b>.20</b>, <b>.30</b> and <b>.99</b>.',
         'Tag each one with its VLAN and give it the <b>.1</b> address of that subnet.',
@@ -1127,7 +1127,7 @@ L({
       done: 'Five interfaces up, four of them gateways.',
       why: 'One physical cable carries four networks because the trunk tags each frame. The subinterface that matches the tag is the one that handles the packet — that is the whole trick.' },
 
-    { t: 'PHASE 4 — Address staff and customers automatically, with different rules',
+    { d: 'R1', t: 'PHASE 4 — Address staff and customers automatically, with different rules',
       do: [
         'Exclude the first 20 addresses of <b>10.80.10.0/24</b> and <b>10.80.30.0/24</b>.',
         'Build pool <b>STAFF</b> with a <b>1-day</b> lease and pool <b>GUEST</b> with a <b>2-hour</b> lease (<code>lease 0 2 0</code>).',
@@ -1136,7 +1136,7 @@ L({
       done: 'Two pools with deliberately different lease lengths.',
       why: 'Lease length is a design decision, not a default. Customers sit for an hour and leave; a 1-day guest lease in a busy café exhausts the pool by mid-afternoon and the last twenty customers get nothing.' },
 
-    { t: 'PHASE 5 — Translate the whole site onto one public address',
+    { d: 'R1', t: 'PHASE 5 — Translate the whole site onto one public address',
       do: [
         'Mark <b>G0/0</b> as <code>ip nat outside</code> and all four subinterfaces as <code>ip nat inside</code>.',
         'Build <code>access-list 1 permit 10.80.0.0 0.0.255.255</code> and configure <code>ip nat inside source list 1 interface g0/0 overload</code>.',
@@ -1145,7 +1145,7 @@ L({
       done: 'The office PC reaches the internet and R1 lists a translation for it.',
       why: 'One ACL and one command put an entire business behind a single address. <code>overload</code> is what makes it PAT: the port number is what keeps hundreds of conversations apart.' },
 
-    { t: 'Publish the camera recorder — and only the recorder',
+    { d: 'R1', t: 'Publish the camera recorder — and only the recorder',
       do: [
         'Add a static NAT: <code>ip nat inside source static 10.80.10.20 203.0.113.3</code>.',
         'From <b>PAYGW</b> (standing in for a device out on the internet), ping <b>203.0.113.2</b> to prove the public side is live.',
@@ -1154,7 +1154,7 @@ L({
       done: 'A permanent one-to-one mapping appears in the translation table while everything else stays hidden behind PAT.',
       why: 'Static NAT is a permanent, two-way mapping, which is what makes an inside host reachable from outside. PAT alone cannot do this — there is no translation until an inside host starts a conversation.' },
 
-    { t: 'PHASE 6 — Isolate the customers',
+    { d: 'R1', t: 'PHASE 6 — Isolate the customers',
       do: [
         'Build extended ACL <b>GUEST-IN</b>: <code>deny ip 10.80.30.0 0.0.0.255 10.80.0.0 0.0.255.255</code>, then <code>permit ip any any</code>.',
         'Apply it <b>inbound</b> on <b>G0/1.30</b>.',
@@ -1163,7 +1163,7 @@ L({
       done: 'Customers have internet access and no path to anything of the business\'s.',
       why: 'The deny is written against the whole 10.80.0.0/16, not each subnet, so it keeps working when the owner adds a VLAN next year. The trailing permit is what still lets DHCP and the internet through.' },
 
-    { t: 'Isolate the till, in both directions',
+    { d: 'R1', t: 'Isolate the till, in both directions',
       do: [
         'Build <b>POS-IN</b>: <code>permit tcp 10.80.20.0 0.0.0.255 host 198.51.100.50 eq 443</code>, then <code>deny ip any any</code>.',
         'Apply it inbound on <b>G0/1.20</b>.',
@@ -1388,7 +1388,7 @@ L({
       done: 'Two routed ports and three SVI gateways, all up.',
       why: 'The core is where HQ traffic is routed and where the WAN and the internet both attach. Getting it right first means every later phase has something to connect to.' },
 
-    { t: 'Bond the access uplinks and take the spanning-tree root',
+    { d: 'CORE', t: 'Bond the access uplinks and take the spanning-tree root',
       do: [
         'Set <code>spanning-tree mode rapid-pvst</code> and make CORE root for VLANs <b>1,10,20,99</b>.',
         'Put <b>G0/2</b> and <b>G0/3</b> into <code>channel-group 1 mode active</code> as dot1q trunks, then configure <b>Port-channel 1</b> to allow <b>10,20,99</b>.',

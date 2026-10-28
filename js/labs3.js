@@ -969,7 +969,7 @@ L({
     ] },
   ],
   tasks: [
-    { t: 'PHASE 1 — Read spanning tree on all four switches before touching anything',
+    { d: 'SW1', t: 'PHASE 1 — Read spanning tree on all four switches before touching anything',
       do: [
         'On each of <b>SW1</b>, <b>SW2</b>, <b>SW3</b> and <b>SW4</b>, enter privileged EXEC and display the spanning-tree status.',
         'Work out which switch won the root election, and why.',
@@ -977,14 +977,14 @@ L({
       done: 'All four switches agree on the same root bridge.',
       why: 'With every priority equal at 32768, the lowest MAC address wins — which means the oldest switch in the building usually becomes root by accident.' },
 
-    { t: 'PHASE 2 — Create VLANs 10 and 20 on all four switches',
+    { d: 'SW1', t: 'PHASE 2 — Create VLANs 10 and 20 on all four switches',
       do: [
         'On each switch: set its hostname, then create VLAN <b>10</b> named <b>USERS</b> and VLAN <b>20</b> named <b>SERVERS</b>.',
       ],
       done: 'All four switches carry both VLANs.',
       why: 'Spanning tree here is per VLAN, so both VLANs must exist everywhere before you can give them different roots.' },
 
-    { t: 'PHASE 3 — Put all four switches into Rapid PVST+',
+    { d: 'SW1', t: 'PHASE 3 — Put all four switches into Rapid PVST+',
       do: [
         'On each of the four switches, set the spanning-tree mode to <b>rapid-pvst</b>.',
         'Then on <b>SW4</b> only, step back to <b>pvst</b>, look at the output, and return to <b>rapid-pvst</b>.',
