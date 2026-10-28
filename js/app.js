@@ -319,7 +319,12 @@ function renderLab(lab, keepState) {
     }
     const wb = e.target.closest ? e.target.closest('.whybtn') : null;
     if (wb) {
-      const why = wb.parentElement.nextElementSibling;
+      /* The explanation is the last child of the task, after the instruction
+         list and the done-when box. Stepping to the sibling of the button's own
+         row lands on whichever of those happens to come first, so this toggled
+         the instructions instead of the explanation. */
+      const li = wb.closest('li');
+      const why = li ? li.querySelector('.taskwhy') : null;
       if (why) {
         why.hidden = !why.hidden;
         wb.setAttribute('aria-expanded', String(!why.hidden));
