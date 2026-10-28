@@ -288,6 +288,27 @@ const KEYWORD_DESC = {
   'show ip interface': 'IP interface status and configuration',
 };
 
+/* A REST token means "the rest of the line", which is right for free text like
+   a banner or a description but wrong where IOS actually offers a fixed set of
+   keywords -- those were all reported as a bare "LINE". These spell the set out
+   so "?" can list it, and so it can list what is LEFT once some are typed. */
+const REST_OPTIONS = {
+  'ip arp inspection validate': [
+    ['dst-mac', 'Validate destination MAC address'],
+    ['ip', 'Validate IP addresses'],
+    ['src-mac', 'Validate source MAC address'],
+  ],
+  'transport input': [
+    ['all', 'All protocols', true],
+    ['none', 'No protocols', true],
+    ['ssh', 'TCP/IP SSH protocol'],
+    ['telnet', 'TCP/IP Telnet protocol'],
+  ],
+};
+/* third element: this keyword stands alone, so it is offered only as the first
+   choice and nothing may follow it -- "transport input ssh telnet" is valid,
+   "transport input all telnet" is not. */
+
 ND.helpFor = function (topo, dev, lineBeforeQ) {
   const specs = specsFor(dev);
   const endsWithSpace = /\s$/.test(lineBeforeQ) || lineBeforeQ === '';
@@ -314,18 +335,40 @@ ND.helpFor = function (topo, dev, lineBeforeQ) {
   }
   for (const spec of consider) {
     // walk pattern against prefix
-    let pi = 0, ok = true;
+    let pi = 0, ok = true, restAt = -1;
     for (let k = 0; k < prefix.length; k++) {
       const t = prefix[k];
       const p = spec.pat[pi];
       if (p === undefined) { ok = false; break; }
-      if (p === 'REST') { pi = spec.pat.length; break; }
+      if (p === 'REST') { restAt = pi; pi = spec.pat.length; break; }
       if (isPlaceholder(p)) { if (!placeOk(p, t)) { ok = false; break; } }
       else if (!p.toLowerCase().startsWith(t.toLowerCase())) { ok = false; break; }
       else if (p.toLowerCase() !== t.toLowerCase() && exactAt[k].size) { ok = false; break; }
       pi++;
     }
     if (!ok) continue;
+    if (restAt < 0 && pi < spec.pat.length && spec.pat[pi] === 'REST') restAt = pi;
+    const restOpts = restAt >= 0
+      ? REST_OPTIONS[spec.pat.slice(0, restAt).map(x => x.toLowerCase()).join(' ')]
+      : null;
+    if (restOpts) {
+      const used = prefix.slice(restAt).map(t => t.toLowerCase());
+      /* Something typed here that is not one of the choices makes the command
+         unrecognised, so this spec offers nothing rather than reporting <cr>
+         and implying what was typed will be accepted. */
+      if (used.every(u => restOpts.some(o => o[0] === u))) {
+        const partial = !endsWithSpace && toks.length ? toks[toks.length - 1].toLowerCase() : null;
+        const soloUsed = used.some(u => (restOpts.find(o => o[0] === u) || [])[2]);
+        for (const [name, d, solo] of restOpts) {
+          if (used.includes(name) || soloUsed) continue;
+          if (solo && used.length) continue;
+          if (partial !== null && !name.startsWith(partial)) continue;
+          opts.set(name, d);
+        }
+        if (used.length && partial === null) opts.set('<cr>', '');
+      }
+      continue;
+    }
     const next = pi < spec.pat.length ? spec.pat[pi] : '<cr>';
     let label = next === '<cr>' ? '<cr>' : isPlaceholder(next) ? PLACE[next] : next.toLowerCase();
     if (!endsWithSpace && toks.length) {
@@ -343,8 +386,9 @@ ND.helpFor = function (topo, dev, lineBeforeQ) {
   }
   if (!opts.size) return ['% Unrecognized command'];
   const width = Math.max(...[...opts.keys()].map(k => k.length)) + 2;
-  return [...opts.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([k, d]) => '  ' + k.padEnd(width) + d);
+  return [...opts.entries()]
+    .sort((a, b) => (a[0] === '<cr>') - (b[0] === '<cr>') || a[0].localeCompare(b[0]))
+    .map(([k, d]) => ('  ' + k.padEnd(width) + d).replace(/\s+$/, ''));
 };
 
 /* ---------- tab completion ---------- */
