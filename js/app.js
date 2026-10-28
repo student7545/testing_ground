@@ -317,6 +317,11 @@ function renderLab(lab, keepState) {
       body.innerHTML = tabDefs[activeTab][1]();
       return;
     }
+    if (e.target && e.target.id === 'dettoggle') {
+      store.set('hideDetail', !store.get('hideDetail', true));
+      body.innerHTML = tabDefs[activeTab][1]();
+      return;
+    }
     const wb = e.target.closest ? e.target.closest('.whybtn') : null;
     if (wb) {
       /* The explanation is the last child of the task, after the instruction
@@ -369,13 +374,19 @@ function renderLab(lab, keepState) {
   }
 }
 
-function taskHtml(t, mode) {
+function taskHtml(t, mode, hideDetail) {
   if (typeof t === 'string') return `<li><div class="taskline"><span class="tasktext">${t}</span></div></li>`;
   const dos = mode === 'drill' ? null : (Array.isArray(t.do) ? t.do : null);
   let h = `<li><div class="taskline"><span class="tasktext">${t.t}</span>`;
   if (t.why) h += `<button class="whybtn" aria-expanded="false">why?</button>`;
   h += `</div>`;
-  if (dos) h += `<ul class="taskdo">${dos.map(d => `<li>${d}</li>`).join('')}</ul>`;
+  if (dos) {
+    /* The headline says what to achieve; the detail says how. Keeping the how
+       behind a disclosure means you attempt the task first and reveal the
+       hand-holding only when you are stuck. */
+    const list = `<ul class="taskdo">${dos.map(d => `<li>${d}</li>`).join('')}</ul>`;
+    h += hideDetail ? `<details class="taskmore"><summary>Show steps</summary>${list}</details>` : list;
+  }
   if (t.done) h += `<div class="taskdone"><span class="donelabel">Done when</span>${t.done}</div>`;
   if (t.why) h += `<div class="taskwhy" hidden>${t.why}</div>`;
   return h + `</li>`;
@@ -414,8 +425,15 @@ function instructionsHtml(lab, mode) {
     return h;
   }
 
+  const hideDetail = store.get('hideDetail', true);
   let h = `<p>${lab.intro}</p>`;
-  h += `<h3>Your tasks</h3><ol class="tasks">${lab.tasks.map(t => taskHtml(t, mode)).join('')}</ol>`;
+  if (mode === 'drill') {
+    h += `<h3>Your tasks</h3>`;
+  } else {
+    h += `<div class="ctlrow"><h3>Your tasks</h3><button class="btn small" id="dettoggle">${hideDetail ? 'Details: hidden' : 'Details: shown'}</button></div>`;
+    if (hideDetail) h += `<p class="dim">Each task shows what to achieve \u2014 open <b>Show steps</b> only if you need telling how.</p>`;
+  }
+  h += `<ol class="tasks">${lab.tasks.map(t => taskHtml(t, mode, hideDetail)).join('')}</ol>`;
   if (mode === 'drill') {
     h += `<div class="callout"><b>Drill mode.</b> Each task is boiled down to its headline and the step-by-step commands are hidden \u2014 work from the task list and the live checks alone. Switch to <b>Guided</b> in the top bar if you get stuck, or to <b>Practice</b> for the requirements-only version.</div>`;
   } else {
