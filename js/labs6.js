@@ -583,7 +583,7 @@ L({
   intro: `<b>The situation:</b> an IP phone and a PC share a desk and a cable. When somebody starts a large upload, the call breaks up. The link is not broken — it is <em>congested</em>, and congestion treats a voice packet exactly like a backup packet unless you tell it otherwise.<br><b>Your goal:</b> set up the switch end of a QoS design. You will enable QoS, decide where the <b>trust boundary</b> sits, trust the phone's markings while refusing the PC's, and understand what the router does with those markings further along. CCNA QoS is mostly conceptual, but the trust boundary is real configuration and it is where every design starts.`,
   spec: [
     { d: 'SW1 — port layout first', r: [
-      '<b>F0/1</b>: access port in the voice VLAN <b>150</b> (an IP phone is plugged straight into it).',
+      '<b>F0/1</b>: access port in the voice VLAN <b>150</b> — the phone is plugged straight in, and sits in that VLAN untagged (a simulator simplification; see the Explanation tab).',
       '<b>F0/2</b>: access port in data VLAN <b>10</b>, with voice VLAN <b>150</b> also configured.',
     ] },
     { d: 'SW1 — QoS', r: [
@@ -613,7 +613,7 @@ L({
         'Check the result in the interface status output.',
       ],
       done: 'One port sits in the voice VLAN and one carries both a data and a voice VLAN.',
-      why: 'The desk port carries data untagged for the PC and is ready to carry voice tagged in VLAN 150 as soon as a phone is placed in front of it — one cable, two VLANs. QoS is applied on top of that separation.' },
+      why: 'One cable, two VLANs: a phone has a built-in switch, so the PC behind it sends untagged frames into VLAN 10 while the phone tags its own into VLAN 150. F0/2 is that real-world pattern. F0/1 is a deliberate simplification — the simulated phone does not tag, so it is dropped straight into VLAN 150 as a plain access port to keep the call path working. See the Explanation tab.' },
 
     { t: 'Enable QoS globally',
       do: [
@@ -684,7 +684,7 @@ L({
   ],
   steps: [
     { d: 'SW1', t: 'Look at the QoS state before anything is configured.', c: ['enable', 'terminal length 0', 'show mls qos'], note: 'Disabled. Every packet is treated identically and all markings are ignored — fine until the link fills up.' },
-    { d: 'SW1', t: 'Set up the voice and data ports first.', c: ['configure terminal', 'interface f0/1', 'description IP-PHONE-DIRECT', 'switchport mode access', 'switchport access vlan 150', 'exit', 'interface f0/2', 'description PC-WITH-PHONE-READY', 'switchport mode access', 'switchport access vlan 10', 'switchport voice vlan 150', 'exit', 'do show interfaces status'], note: 'The phone sits in the voice VLAN. The desk port next to it carries data untagged for the PC and is ready to carry voice tagged in VLAN 150 as soon as a phone is placed in front of it — one cable, two VLANs.' },
+    { d: 'SW1', t: 'Set up the voice and data ports first.', c: ['configure terminal', 'interface f0/1', 'description IP-PHONE-DIRECT', 'switchport mode access', 'switchport access vlan 150', 'exit', 'interface f0/2', 'description PC-WITH-PHONE-READY', 'switchport mode access', 'switchport access vlan 10', 'switchport voice vlan 150', 'exit', 'do show interfaces status'], note: 'Two different shapes on purpose. F0/2 is how a real desk port looks: data VLAN untagged for the PC, voice VLAN tagged by the phone\'s built-in switch — one cable, two VLANs. F0/1 is where the phone actually is, and it is a plain access port in VLAN 150 because the simulated phone does not tag its traffic; on real hardware you would give it F0/2\'s configuration instead. The Explanation tab covers why.' },
     { d: 'SW1', t: 'Enable QoS globally.', c: ['mls qos', 'do show mls qos'], note: 'Now the switch has queues that behave differently and markings that mean something. On a real Catalyst this single command changes the behaviour of every port.' },
     { d: 'SW1', t: 'Trust DSCP on the uplink to the router.', c: ['interface g0/1', 'mls qos trust dscp', 'exit', 'do show mls qos interface g0/1'], note: 'The uplink carries traffic that has already been classified inside your network, so its markings are believed and preserved.' },
     { d: 'SW1', t: 'Trust the phone — but only while a phone is really there.', c: ['interface f0/1', 'mls qos trust device cisco-phone', 'mls qos trust cos', 'exit', 'do show mls qos interface f0/1'], note: 'Conditional trust: CDP confirms a Cisco phone is attached. Replace the phone with a laptop and the port stops trusting markings automatically — no ticket, no engineer visit.' },
@@ -706,6 +706,9 @@ L({
 <li><b>CoS</b> (Class of Service) — 3 bits in the 802.1Q tag, values 0-7. Layer 2 only, so it is lost the moment a router strips the tag. Voice is normally CoS 5.</li>
 <li><b>DSCP</b> (Differentiated Services Code Point) — 6 bits in the IP header, values 0-63. Survives end to end because it lives at layer 3. Voice is <b>EF</b> (Expedited Forwarding, DSCP 46); call signalling is CS3 (24); video is AF41 (34); best effort is 0.</li>
 </ul>
+<h3>One cable, two VLANs — and why this lab bends the rule</h3>
+<p>An IP phone contains a small three-port switch: one port to the wall, one to the PC on the desk, one to the handset. That is how a single cable carries two VLANs. <code>switchport access vlan 10</code> with <code>switchport voice vlan 150</code> on the same port means the PC's frames arrive <b>untagged</b> and land in VLAN 10, while the phone <b>tags</b> its own frames with VLAN 150. The phone is told which VLAN to tag by CDP or LLDP, so you configure the switch port and never the phone.</p>
+<p>In production, therefore, the voice VLAN belongs on the port the <em>phone</em> is plugged into, with the PC daisy-chained behind it — one port, both VLANs, every desk the same. <b>This lab deliberately does not do that on F0/1.</b> The simulated phone does not tag its traffic the way real hardware does, so on a voice-VLAN port its untagged frames would land in the data VLAN and it would never reach its gateway. F0/1 puts the phone straight into VLAN 150 as a plain access port so the call path actually works and you can ping it; <b>F0/2 is the port that shows you the real-world pattern</b>, which is why it carries two VLANs even though nothing is plugged into it. On real kit you would apply F0/2's configuration to the phone port and be done.</p>
 <h3>The trust boundary</h3>
 <p>The trust boundary is the point where you stop believing what devices tell you about their own traffic. Phones and other managed devices sit inside it; user PCs sit outside. Push the boundary as close to the edge as you can, because a PC that can mark its own packets EF can starve your telephony from a desk.</p>
 <p><code>mls qos trust cos|dscp</code> believes the arriving marking. <code>mls qos trust device cisco-phone</code> believes it only while CDP confirms a phone is attached. <code>no mls qos trust</code> plus <code>mls qos cos 0</code> overwrites whatever the device claimed.</p>
